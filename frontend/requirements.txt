@@ -1,0 +1,8 @@
+# Sentinelle AIOps - Frontend Dependencies
+streamlit
+plotly
+pandas
+numpy
+requests
+reportlab
+python-telegram-bot

@@ -1,0 +1,23 @@
+# Sentinelle AIOps - Backend Dependencies
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+scikit-learn
+pandas
+numpy
+# statsmodels
+netmiko
+psutil
+python-jose[cryptography]
+passlib[bcrypt]
+pyotp
+python-multipart
+apscheduler
+pyyaml>=6.0.1
+requests
+httpx
+pytest
+pytest-cov

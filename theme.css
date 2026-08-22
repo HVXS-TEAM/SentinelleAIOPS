@@ -1,0 +1,500 @@
+/* =========================================================================
+   Sentinelle AIOps — theme.css
+   Source de vérité : DESIGN.md (tokens Stitch). Ne pas modifier les valeurs
+   de couleur/typo/spacing sans les faire correspondre à DESIGN.md.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+/* Pas d'import Material Symbols ici : les icônes utilisent la syntaxe
+   native Streamlit :material/nom: (st.page_link, st.markdown), qui gère
+   son propre chargement de police en interne — plus fiable que notre
+   ancien import CSS, qui échouait silencieusement. */
+
+:root {
+    /* --- Couleurs (DESIGN.md > colors) --- */
+    --surface: #101416;
+    --surface-dim: #101416;
+    --surface-bright: #363a3c;
+    --surface-container-lowest: #0b0f11;
+    --surface-container-low: #191c1e;
+    --surface-container: #1d2022;
+    --surface-container-high: #272a2d;
+    --surface-container-highest: #323538;
+    --on-surface: #e0e3e6;
+    --on-surface-variant: #bdc9c3;
+    --inverse-surface: #e0e3e6;
+    --inverse-on-surface: #2d3133;
+    --outline: #87938e;
+    --outline-variant: #3e4945;
+    --surface-tint: #78d8ba;
+
+    --primary: #78d8ba;
+    --on-primary: #00382b;
+    --primary-container: #3da186;
+    --on-primary-container: #003025;
+    --inverse-primary: #006b55;
+
+    --secondary: #81d0f8;
+    --on-secondary: #003548;
+    --secondary-container: #017094;
+    --on-secondary-container: #ceedff;
+
+    --tertiary: #a7c8ff;
+    --on-tertiary: #003060;
+    --tertiary-container: #6d92cb;
+    --on-tertiary-container: #002a54;
+
+    --error: #ffb4ab;
+    --on-error: #690005;
+    --error-container: #93000a;
+    --on-error-container: #ffdad6;
+
+    --background: #101416;
+    --on-background: #e0e3e6;
+    --surface-variant: #323538;
+
+    /* --- Typographie (DESIGN.md > typography) --- */
+    --font-display: 'IBM Plex Sans', sans-serif;
+    --font-body: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* --- Shapes (DESIGN.md > rounded) --- */
+    --radius-sm: 0.25rem;
+    --radius-md: 0.5rem;   /* boutons, inputs, petites cartes */
+    --radius-lg: 1rem;     /* cartes principales, modals */
+    --radius-xl: 1.5rem;
+    --radius-pill: 9999px; /* badges, tags uniquement */
+
+    /* --- Spacing (DESIGN.md > spacing) --- */
+    --unit: 4px;
+    --sidebar-width: 260px;
+    --header-height: 64px;
+    --gutter: 24px;
+    --margin-mobile: 16px;
+    --margin-desktop: 32px;
+
+    --border-subtle: rgba(255, 255, 255, 0.08);
+
+    /* Couleurs de statut pour la topologie réseau (tons distincts des
+       badges pill existants, plus proches du screen.png Parc Informatique) */
+    --node-healthy: var(--primary);
+    --node-warning: #e0a458;
+    --node-critical: #c9695c;
+
+    /* Accent prédictif/critique (Supervision) — issu du DESIGN.md propre
+       à cet écran, distinct de --error et --tertiary déjà utilisés
+       ailleurs pour ne rien casser sur les écrans précédents. */
+    --predictive-accent: #ffb4a7;
+    --on-predictive-accent: #5a1a12;
+}
+
+/* ---------- Base app ---------- */
+html, body, [class*="css"] {
+    font-family: var(--font-body);
+    color: var(--on-background);
+}
+
+.stApp {
+    background-color: var(--background);
+    color: var(--on-background);
+}
+
+h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: var(--on-surface);
+    letter-spacing: -0.02em;
+}
+
+/* Toutes les données chiffrées / timestamps / hash / labels techniques
+   doivent porter la classe .mono (voir components.py) */
+.mono, code, .stCode {
+    font-family: var(--font-mono) !important;
+}
+
+/* ---------- Navigation : items de sidebar_nav(), enveloppés dans de
+   vrais st.container(key="navitem-N"[-active]) — la classe .st-key-...
+   est générée par Streamlit sur le VRAI conteneur parent, donc les
+   sélecteurs descendants ci-dessous s'appliquent réellement (contrairement
+   à l'ancienne technique div ouvrante/fermante sur deux appels séparés,
+   qui ne créait aucune vraie relation parent-enfant). ---------- */
+div[class*="st-key-navitem-"] {
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 2px;
+    border-left: 4px solid transparent;
+    padding: 2px 4px;
+}
+div[class*="st-key-navitem-"][class*="-active"] {
+    background: var(--surface-container);
+    border-left: 4px solid var(--primary);
+}
+div[class*="st-key-navitem-"] [data-testid="stPageLink"] p,
+div[class*="st-key-navitem-"] [data-testid="stPageLink"] span {
+    font-family: var(--font-mono) !important;
+    font-size: 13px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--on-surface-variant) !important;
+}
+div[class*="st-key-navitem-"][class*="-active"] [data-testid="stPageLink"] p,
+div[class*="st-key-navitem-"][class*="-active"] [data-testid="stPageLink"] span {
+    color: var(--primary) !important;
+}
+/* Icône SVG inline de la sidebar : grise par défaut, teal sur l'item actif */
+.nav-icon { color: var(--on-surface-variant); display: flex; align-items: center; }
+.nav-icon svg { width: 20px; height: 20px; display: block; }
+div[class*="st-key-navitem-"][class*="-active"] .nav-icon { color: var(--primary); }
+div[class*="st-key-navitem-"] [data-testid="stHorizontalBlock"] { align-items: center; gap: 0; }
+div[class*="st-key-sentinelle-logo"] {
+    padding: 8px 4px 24px 4px;
+}
+
+/* ---------- Masquer la navigation multipage NATIVE de Streamlit
+   (générée automatiquement à partir du dossier pages/) : sinon elle
+   s'affiche en plus de sidebar_nav() custom, d'où le doublon visible
+   en haut de la sidebar. ---------- */
+section[data-testid="stSidebarNav"] {
+    display: none;
+}
+
+/* ---------- Sidebar native masquée : on la restyle plutôt que de la
+   remplacer entièrement, pour rester compatible avec st.sidebar ---------- */
+section[data-testid="stSidebar"] {
+    background-color: var(--surface-container-lowest);
+    border-right: 1px solid var(--border-subtle);
+    width: var(--sidebar-width) !important;
+}
+
+section[data-testid="stSidebar"] .block-container {
+    padding-top: var(--gutter);
+}
+
+/* ---------- Barre d'outils native Streamlit (Deploy / menu ⋮) :
+   on la laisse visible mais transparente et on force son passage
+   au-dessus (z-index) pour qu'elle ne soit jamais recouverte, et on
+   pousse le contenu de la page sous elle pour éviter le chevauchement
+   avec .sentinelle-header. ---------- */
+header[data-testid="stHeader"] {
+    background-color: var(--surface);
+    z-index: 999;
+}
+
+.stApp > header + div .block-container {
+    padding-top: 0 !important;
+}
+
+/* Header top bar custom (top_header()), enveloppé dans un vrai
+   st.container(key="sentinelle-header") : sticky sous la barre Streamlit,
+   au-dessus du contenu de la page. */
+div[class*="st-key-sentinelle-header"] {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    padding: 12px var(--margin-desktop);
+    border-bottom: 1px solid var(--border-subtle);
+    background-color: var(--surface);
+    margin: 0 -1rem 16px -1rem; /* compense le padding par défaut du block-container */
+}
+div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
+    background-color: var(--surface-container-low);
+    border-radius: var(--radius-pill);
+}
+
+/* ---------- Score badge (deux lignes : valeur + label), ex. "82% / CIS
+   SCORE" — utilisé sur les listes d'équipements/audits. ---------- */
+.score-badge {
+    display: inline-block;
+    text-align: center;
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    min-width: 76px;
+}
+.score-badge-value { font-size: 16px; font-weight: 700; }
+.score-badge-label { font-size: 9px; letter-spacing: 0.05em; opacity: 0.85; }
+.score-badge-critical {
+    background-color: rgba(147, 0, 10, 0.5);
+    color: #ffb4ab;
+}
+.score-badge-healthy {
+    background-color: rgba(120, 216, 186, 0.15);
+    color: var(--primary);
+}
+
+/* ---------- Finding d'audit : bloc à bordure gauche colorée ---------- */
+.finding {
+    border-left: 3px solid var(--outline-variant);
+    padding: 4px 0 4px 12px;
+    margin-bottom: 16px;
+}
+.finding-title { font-weight: 600; color: var(--on-surface); margin-bottom: 2px; }
+.finding-subtitle { font-size: 13px; color: var(--on-surface-variant); }
+.finding-critical { border-left-color: var(--error); }
+.finding-warning { border-left-color: #ffcc80; }
+.finding-neutral { border-left-color: var(--outline-variant); }
+.finding-active {
+    background: var(--surface-container-low);
+    border-radius: 0 8px 8px 0;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* ---------- Bloc de code avec diff coloré ---------- */
+.code-diff-block {
+    background-color: var(--surface-container-lowest);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+}
+.code-line { color: var(--on-surface-variant); }
+.code-line-removed {
+    background-color: rgba(255, 180, 171, 0.12);
+    color: var(--error);
+}
+.code-line-added {
+    background-color: rgba(120, 216, 186, 0.12);
+    color: var(--primary);
+}
+
+/* ---------- Topologie réseau (SVG statique) ---------- */
+.topology-svg { width: 100%; height: auto; display: block; }
+.topo-label {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 600;
+    fill: var(--on-surface);
+}
+
+/* ---------- Mini graphique en barres (perf 24h) ---------- */
+.mini-bar-chart { display: flex; align-items: flex-end; gap: 3px; }
+.mini-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 4px; }
+
+/* ---------- Item d'alerte/anomalie ---------- */
+.alert-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(255, 180, 171, 0.06);
+    border: 1px solid rgba(255, 180, 171, 0.2);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.alert-icon { font-size: 16px; }
+.alert-title { font-weight: 600; font-size: 13px; color: var(--on-surface); }
+.alert-subtitle { font-size: 12px; color: var(--on-surface-variant); }
+
+/* ---------- Champ label/valeur (grille identification) ---------- */
+.field-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--on-surface-variant);
+    margin-bottom: 2px;
+}
+.field-value { font-weight: 600; color: var(--on-surface); margin-bottom: 12px; }
+
+/* ---------- Radar de menaces (anneaux + points) ---------- */
+.radar-wrap {
+    position: relative;
+    background-image: radial-gradient(var(--outline-variant) 1px, transparent 1px);
+    background-size: 24px 24px;
+    border-radius: var(--radius-md);
+}
+.radar-svg { width: 100%; height: auto; display: block; }
+
+/* ---------- Tuile statistique ---------- */
+.stat-tile {
+    background: var(--surface-container-low);
+    border-radius: var(--radius-md);
+    padding: 16px;
+}
+.stat-tile-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--on-surface-variant);
+    margin-bottom: 8px;
+}
+.stat-tile-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; }
+
+/* ---------- Jauge circulaire (donut) ---------- */
+.donut-wrap { position: relative; margin: 0 auto; }
+.donut-svg { width: 100%; height: 100%; }
+.donut-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+}
+.donut-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--on-surface); }
+.donut-label {
+    font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--on-surface-variant);
+}
+
+/* ---------- Barre de progression horizontale ---------- */
+.progress-row { margin-bottom: 14px; }
+.progress-row-top {
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--on-surface); margin-bottom: 6px;
+}
+.progress-track {
+    height: 6px; background: var(--surface-container-high);
+    border-radius: 3px; overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 3px; }
+
+/* ---------- Badge de sévérité (CRITICAL/HIGH/MEDIUM) ---------- */
+.severity-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 4px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    border: 1px solid transparent;
+}
+.severity-critical { background: rgba(201, 105, 92, 0.15); color: var(--node-critical); border-color: rgba(201, 105, 92, 0.4); }
+.severity-high { background: rgba(224, 164, 88, 0.15); color: var(--node-warning); border-color: rgba(224, 164, 88, 0.4); }
+.severity-medium { background: rgba(129, 208, 248, 0.12); color: var(--secondary); border-color: rgba(129, 208, 248, 0.35); }
+
+/* ---------- Graphique de tendance (historique + prédiction) ---------- */
+.trend-svg { width: 100%; height: auto; display: block; }
+.trend-threshold-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: var(--predictive-accent);
+}
+
+/* ---------- Item "Urgence Maintenance" ---------- */
+.maint-item {
+    border-left: 3px solid var(--outline-variant);
+    background: var(--surface-container-low);
+    border-radius: 0 8px 8px 0;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+.maint-item-top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 4px; gap: 8px;
+}
+.maint-item-name { font-weight: 700; color: var(--on-surface); }
+.maint-item-severity {
+    font-family: var(--font-mono); font-size: 10px;
+    padding: 2px 8px; border-radius: 4px; border: 1px solid; white-space: nowrap;
+}
+.maint-item-desc { font-size: 13px; color: var(--on-surface-variant); margin-bottom: 6px; }
+.maint-item-eta { font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant); }
+
+/* ---------- Sliders de seuil (st.slider natif stylé) ---------- */
+div[data-testid="stSlider"] [role="slider"] {
+    background-color: var(--predictive-accent) !important;
+    border-color: var(--predictive-accent) !important;
+}
+div[data-testid="stSlider"] > div > div > div {
+    background-color: var(--predictive-accent) !important;
+}
+
+/* ---------- Boutons ---------- */
+.stButton > button {
+    background-color: var(--primary);
+    color: var(--on-primary);
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-weight: 600;
+    padding: 0.5rem 1.25rem;
+    transition: filter 0.15s ease;
+}
+.stButton > button:hover {
+    filter: brightness(1.08);
+    color: var(--on-primary);
+}
+
+/* Bouton "ghost" : ajouter la classe via st.markdown wrapper, cf. components.py */
+.stButton.ghost > button {
+    background-color: transparent;
+    color: var(--secondary);
+    border: 1px solid var(--secondary);
+}
+
+/* Bouton destructif / rejet */
+.stButton.danger > button {
+    background-color: transparent;
+    color: var(--error);
+    border: 1px solid var(--error);
+}
+
+/* ---------- Cartes : enveloppées dans un vrai st.container(key="card-N"),
+   cf. components.py -> card(). ---------- */
+div[class*="st-key-card-"] {
+    background-color: var(--surface-container);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+}
+
+div[class*="st-key-card-"] .card-header {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--on-surface-variant);
+    margin-bottom: 8px;
+}
+
+/* ---------- Badges de statut (pill) ---------- */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+}
+.badge-healthy   { background-color: rgba(120, 216, 186, 0.15); color: var(--primary); }
+.badge-warning   { background-color: rgba(255, 180, 171, 0.12); color: #ffcc80; }
+.badge-critical  {
+    background-color: rgba(255, 180, 171, 0.15);
+    color: var(--error);
+    animation: pulse-critical 1.4s ease-in-out infinite;
+}
+@keyframes pulse-critical {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 180, 171, 0.35); }
+    50%      { box-shadow: 0 0 0 4px rgba(255, 180, 171, 0.08); }
+}
+
+/* ---------- Tables ---------- */
+[data-testid="stDataFrame"], [data-testid="stTable"] {
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+[data-testid="stDataFrame"] div[role="row"]:nth-child(even) {
+    background-color: var(--surface-container-low);
+}
+[data-testid="stDataFrame"] * {
+    font-family: var(--font-mono) !important;
+    font-size: 13px;
+}
+
+/* ---------- Inputs ---------- */
+.stTextInput > div > div > input,
+.stTextArea textarea {
+    background-color: var(--surface-container-low);
+    color: var(--on-surface);
+    border: 1px solid var(--outline-variant);
+    border-radius: var(--radius-md);
+}
+.stTextInput > div > div > input:focus,
+.stTextArea textarea:focus {
+    border-color: var(--secondary);
+    box-shadow: 0 0 0 1px var(--secondary);
+}

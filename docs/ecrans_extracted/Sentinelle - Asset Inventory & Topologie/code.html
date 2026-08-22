@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Sentinelle AIOps - Parc informatique</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-tint": "#78d8ba",
+                "surface-dim": "#0f1412",
+                "surface": "#0f1412",
+                "on-primary-container": "#003025",
+                "inverse-primary": "#006b55",
+                "surface-container-low": "#181d1b",
+                "on-tertiary": "#5a1a12",
+                "on-secondary": "#003548",
+                "secondary-fixed": "#c1e8ff",
+                "surface-container-lowest": "#0a0f0d",
+                "primary-fixed": "#94f5d6",
+                "error": "#ffb4ab",
+                "surface-container-highest": "#313633",
+                "tertiary": "#ffb4a7",
+                "surface-bright": "#353a38",
+                "secondary": "#81d0f8",
+                "on-error": "#690005",
+                "surface-variant": "#313633",
+                "background": "#0f1412",
+                "on-tertiary-container": "#51140c",
+                "secondary-fixed-dim": "#81d0f8",
+                "surface-container": "#1c211e",
+                "on-primary-fixed": "#002018",
+                "on-primary": "#00382b",
+                "on-secondary-container": "#ceedff",
+                "on-secondary-fixed": "#001e2b",
+                "on-surface-variant": "#bdc9c3",
+                "on-tertiary-fixed-variant": "#783025",
+                "on-surface": "#dfe4e0",
+                "on-primary-fixed-variant": "#005140",
+                "tertiary-fixed-dim": "#ffb4a7",
+                "primary-fixed-dim": "#78d8ba",
+                "on-background": "#dfe4e0",
+                "primary-container": "#3da186",
+                "outline": "#87938e",
+                "surface-container-high": "#262b29",
+                "on-error-container": "#ffdad6",
+                "error-container": "#93000a",
+                "outline-variant": "#3e4945",
+                "tertiary-fixed": "#ffdad4",
+                "tertiary-container": "#d37768",
+                "inverse-on-surface": "#2c322f",
+                "on-secondary-fixed-variant": "#004d67",
+                "secondary-container": "#017094",
+                "on-tertiary-fixed": "#3d0502",
+                "inverse-surface": "#dfe4e0",
+                "primary": "#78d8ba"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "sidebar-width": "240px",
+                "md": "16px",
+                "sm": "12px",
+                "xs": "8px",
+                "lg": "24px",
+                "xl": "32px",
+                "base": "4px",
+                "header-height": "56px"
+        },
+        "fontFamily": {
+                "label-caps": [
+                        "Inter"
+                ],
+                "display-md": [
+                        "Inter"
+                ],
+                "display-lg": [
+                        "Inter"
+                ],
+                "body-sm": [
+                        "Inter"
+                ],
+                "headline-sm": [
+                        "Inter"
+                ],
+                "body-md": [
+                        "Inter"
+                ],
+                "data-mono": [
+                        "IBM Plex Sans"
+                ]
+        },
+        "fontSize": {
+                "label-caps": [
+                        "11px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "display-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "display-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "body-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-sm": [
+                        "18px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "data-mono": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .topology-node-healthy { fill: #3da186; }
+        .topology-node-warning { fill: #d37768; }
+        .topology-node-critical { fill: #ffb4ab; }
+        .topology-link { stroke: #3e4945; stroke-width: 1.5; }
+        .topology-label { fill: #dfe4e0; font-family: 'Inter', sans-serif; font-size: 10px; }
+        
+        /* Custom scrollbar for dark mode */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3e4945; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #87938e; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen w-screen overflow-hidden flex selection:bg-primary/30 selection:text-primary-fixed">
+<!-- SideNavBar -->
+<nav class="bg-surface-container dark:bg-surface-container fixed left-0 top-0 h-screen w-sidebar-width border-r border-outline-variant dark:border-outline-variant flex flex-col h-full py-lg z-40">
+<div class="px-md mb-8 flex items-center justify-center">
+<img alt="Sentinelle Logo" class="h-12 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AP1WRLv6mPhRiZVm5EWpMKy0lktxmGwBLRSCy_I2gipK-NKtiaUGkOBLcrjJpLYbDweg_lLWpGsIYsqy1Yw3MjZ2_tJliI5wBz_mdbXysn09CW_lSmjXm1_JJfowKRkDZe3Xnwv1vLwKWelCgwkFvu7JTzw3l-jB0veZ5RTfK4Fg_Vbzd5MHKKKnfYOd2de0wJOxE96oRgrzJkAQsb2NctBDAvkCjnvNFGsWUJCOE9LKtv8IXEFQJkkIyEDUsGpk"/>
+</div>
+<div class="flex-1 overflow-y-auto">
+<ul class="space-y-base">
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span>Dashboard</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">monitoring</span>
+<span>Supervision</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">security</span>
+<span>Sécurité</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">lan</span>
+<span>NetDevOps</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-primary dark:text-primary border-l-4 border-primary bg-primary-container/10 duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span>Parc informatique</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">assessment</span>
+<span>Rapports</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">smart_toy</span>
+<span>Assistant IA</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings</span>
+<span>Administration</span>
+</a>
+</li>
+</ul>
+</div>
+<div class="mt-auto">
+<ul class="space-y-base">
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">help</span>
+<span>Help</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-md px-md py-sm text-on-surface-variant dark:text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">logout</span>
+<span>Logout</span>
+</a>
+</li>
+</ul>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="bg-surface dark:bg-surface fixed top-0 right-0 h-header-height z-40 border-b border-outline-variant dark:border-outline-variant flex items-center justify-between px-lg left-sidebar-width w-[calc(100%-240px)]">
+<div class="flex items-center flex-1 max-w-md relative">
+<span class="material-symbols-outlined absolute left-sm text-on-surface-variant" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant/30 rounded-md py-[6px] pl-[36px] pr-sm font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-colors" placeholder="Search resources (Cmd+K)..." type="text"/>
+<span class="absolute right-sm text-on-surface-variant font-data-mono text-[10px] bg-surface-container px-1 py-0.5 rounded border border-outline-variant/30">⌘K</span>
+</div>
+<div class="flex items-center gap-sm">
+<button class="text-on-surface-variant hover:bg-surface-container-highest/50 dark:hover:bg-surface-container-highest/50 rounded-full p-2 cursor-pointer transition-all duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-highest/50 dark:hover:bg-surface-container-highest/50 rounded-full p-2 cursor-pointer transition-all duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings_suggest</span>
+</button>
+<button class="text-on-surface-variant hover:bg-surface-container-highest/50 dark:hover:bg-surface-container-highest/50 rounded-full p-2 cursor-pointer transition-all duration-200 flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">apps</span>
+</button>
+<div class="h-6 w-px bg-outline-variant/30 mx-xs"></div>
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-sm">
+        A
+    </div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="ml-[240px] mt-[56px] w-[calc(100%-240px)] h-[calc(100vh-56px)] flex flex-col p-md gap-md overflow-hidden bg-background">
+<!-- Header Actions -->
+<div class="flex justify-between items-end flex-shrink-0">
+<div>
+<h2 class="font-display-md text-display-md text-on-background">Parc informatique</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Gérez et visualisez l'ensemble de vos actifs réseau.</p>
+</div>
+<div class="flex gap-sm">
+<button class="bg-surface-container border border-outline-variant text-on-surface px-md py-sm rounded-md font-body-sm text-body-sm flex items-center gap-xs hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">filter_list</span>
+                    Filtrer
+                </button>
+<button class="bg-primary text-on-primary px-md py-sm rounded-md font-body-sm text-body-sm font-medium flex items-center gap-xs hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">add</span>
+                    Ajouter un équipement
+                </button>
+</div>
+</div>
+<!-- Top Section: Topology Map -->
+<div class="flex-1 bg-surface-container-low rounded-lg border border-outline-variant relative overflow-hidden flex flex-col min-h-[300px]">
+<div class="absolute top-sm left-sm z-10 bg-surface-container-high/80 backdrop-blur px-sm py-xs rounded border border-outline-variant/30 flex items-center gap-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant">VUE TOPOLOGIQUE</span>
+</div>
+<!-- Map Controls -->
+<div class="absolute bottom-sm right-sm z-10 flex flex-col gap-xs">
+<button class="bg-surface-container-high/90 border border-outline-variant/30 text-on-surface p-1.5 rounded hover:bg-surface-container-highest transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">add</span>
+</button>
+<button class="bg-surface-container-high/90 border border-outline-variant/30 text-on-surface p-1.5 rounded hover:bg-surface-container-highest transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">remove</span>
+</button>
+<button class="bg-surface-container-high/90 border border-outline-variant/30 text-on-surface p-1.5 rounded hover:bg-surface-container-highest transition-colors flex items-center justify-center mt-1">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">fit_screen</span>
+</button>
+</div>
+<!-- Legend -->
+<div class="absolute bottom-sm left-sm z-10 bg-surface-container-high/80 backdrop-blur p-sm rounded border border-outline-variant/30">
+<div class="flex items-center gap-xs mb-1">
+<div class="w-3 h-3 rounded-full bg-primary-container"></div>
+<span class="font-body-sm text-body-sm text-[11px] text-on-surface-variant">Sain</span>
+</div>
+<div class="flex items-center gap-xs mb-1">
+<div class="w-3 h-3 rounded-full bg-tertiary-container"></div>
+<span class="font-body-sm text-body-sm text-[11px] text-on-surface-variant">Avertissement</span>
+</div>
+<div class="flex items-center gap-xs">
+<div class="w-3 h-3 rounded-full bg-error"></div>
+<span class="font-body-sm text-body-sm text-[11px] text-on-surface-variant">Critique</span>
+</div>
+</div>
+<!-- SVG Topology Graph Mockup -->
+<div class="w-full h-full flex items-center justify-center cursor-move" style="background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0); background-size: 24px 24px;">
+<svg class="w-full h-full max-w-4xl opacity-80" height="300" viewbox="0 0 600 300" width="600">
+<g>
+<!-- Links -->
+<line class="topology-link" x1="300" x2="150" y1="50" y2="150"></line>
+<line class="topology-link" x1="300" x2="450" y1="50" y2="150"></line>
+<line class="topology-link" x1="150" x2="100" y1="150" y2="250"></line>
+<line class="topology-link" x1="150" x2="200" y1="150" y2="250"></line>
+<line class="topology-link" stroke-dasharray="4" x1="450" x2="400" y1="150" y2="250"></line>
+<line class="topology-link" x1="450" x2="500" y1="150" y2="250"></line>
+<line class="topology-link" opacity="0.3" x1="200" x2="400" y1="250" y2="250"></line>
+<!-- Core Router (Warning) -->
+<circle class="topology-node-warning" cx="300" cy="50" r="16"></circle>
+<circle cx="300" cy="50" fill="none" opacity="0.5" r="20" stroke="#d37768" stroke-width="1"></circle>
+<text class="topology-label" text-anchor="middle" x="300" y="80">CORE-RTR-01</text>
+<!-- Dist Switch 1 (Healthy) -->
+<circle class="topology-node-healthy" cx="150" cy="150" r="12"></circle>
+<text class="topology-label" text-anchor="middle" x="150" y="175">DIST-SW-A</text>
+<!-- Dist Switch 2 (Healthy) -->
+<circle class="topology-node-healthy" cx="450" cy="150" r="12"></circle>
+<text class="topology-label" text-anchor="middle" x="450" y="175">DIST-SW-B</text>
+<!-- Access Points / Servers -->
+<circle class="topology-node-healthy" cx="100" cy="250" r="8"></circle>
+<text class="topology-label" text-anchor="middle" x="100" y="270">SRV-WEB-01</text>
+<circle class="topology-node-healthy" cx="200" cy="250" r="8"></circle>
+<text class="topology-label" text-anchor="middle" x="200" y="270">SRV-DB-01</text>
+<!-- Critical Node -->
+<circle class="topology-node-critical" cx="400" cy="250" r="8"></circle>
+<circle cx="400" cy="250" fill="none" opacity="0.8" r="14" stroke="#ffb4ab" stroke-width="1">
+<animate attributename="r" dur="2s" repeatcount="indefinite" values="8;16;8"></animate>
+<animate attributename="opacity" dur="2s" repeatcount="indefinite" values="0.8;0;0.8"></animate>
+</circle>
+<text class="topology-label" fill="#ffb4ab" text-anchor="middle" x="400" y="270">FW-EXT-02</text>
+<circle class="topology-node-healthy" cx="500" cy="250" r="8"></circle>
+<text class="topology-label" text-anchor="middle" x="500" y="270">SRV-APP-02</text>
+</g>
+</svg>
+</div>
+</div>
+<!-- Bottom Section: Inventory Table -->
+<div class="h-[40%] bg-surface-container-low rounded-lg border border-outline-variant flex flex-col flex-shrink-0">
+<!-- Table Header / Tools -->
+<div class="p-sm border-b border-outline-variant flex justify-between items-center bg-surface-container rounded-t-lg">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Inventaire (1,248)</h3>
+<div class="flex gap-sm">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-2 top-1.5 text-on-surface-variant text-[16px]" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full bg-surface-container-high border border-outline-variant/30 rounded text-[12px] py-1 pl-8 pr-2 text-on-surface focus:outline-none focus:border-primary/50" placeholder="Filtrer par nom, IP, MAC..." type="text"/>
+</div>
+</div>
+</div>
+<!-- Table -->
+<div class="flex-1 overflow-auto">
+<table class="w-full text-left border-collapse">
+<thead class="sticky top-0 bg-surface-container-high z-10 shadow-md shadow-black/20">
+<tr>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant">Équipement</th>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant">IP / MAC</th>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant">OS / Firmware</th>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant">Uptime</th>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant text-center">Santé</th>
+<th class="py-xs px-sm font-label-caps text-label-caps text-on-surface-variant font-medium border-b border-outline-variant text-right">Dernière vue</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm divide-y divide-outline-variant/50">
+<!-- Row 1: Healthy -->
+<tr class="hover:bg-surface-container-high cursor-pointer group transition-colors">
+<td class="py-2 px-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 0;">router</span>
+<span class="font-medium text-on-surface">CORE-RTR-01</span>
+</div>
+</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant text-[11px]">
+<div>10.0.0.1</div>
+<div class="text-[9px] opacity-70">00:1A:2B:3C:4D:5E</div>
+</td>
+<td class="py-2 px-sm text-on-surface-variant">Cisco IOS XE 17.3.2</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant">342d 12h</td>
+<td class="py-2 px-sm">
+<div class="flex justify-center">
+<div class="relative w-6 h-6 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 24 24">
+<circle cx="12" cy="12" fill="none" r="10" stroke="var(--color-outline-variant)" stroke-width="2"></circle>
+<circle cx="12" cy="12" fill="none" r="10" stroke="#3da186" stroke-dasharray="62.8" stroke-dashoffset="6.28" stroke-width="2"></circle>
+</svg>
+<span class="absolute text-[8px] font-bold text-primary-container">90</span>
+</div>
+</div>
+</td>
+<td class="py-2 px-sm text-right text-on-surface-variant text-[11px]">Il y a 2 min</td>
+</tr>
+<!-- Row 2: Critical -->
+<tr class="bg-error/5 hover:bg-error/10 cursor-pointer group transition-colors border-l-2 border-l-error">
+<td class="py-2 px-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-error text-[18px]" style="font-variation-settings: 'FILL' 0;">security</span>
+<span class="font-medium text-on-surface">FW-EXT-02</span>
+</div>
+</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant text-[11px]">
+<div>192.168.1.254</div>
+<div class="text-[9px] opacity-70">A1:B2:C3:D4:E5:F6</div>
+</td>
+<td class="py-2 px-sm text-on-surface-variant">Palo Alto PAN-OS 10.1</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant">12d 4h</td>
+<td class="py-2 px-sm">
+<div class="flex justify-center">
+<div class="relative w-6 h-6 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 24 24">
+<circle cx="12" cy="12" fill="none" r="10" stroke="var(--color-outline-variant)" stroke-width="2"></circle>
+<circle cx="12" cy="12" fill="none" r="10" stroke="#ffb4ab" stroke-dasharray="62.8" stroke-dashoffset="43.96" stroke-width="2"></circle>
+</svg>
+<span class="absolute text-[8px] font-bold text-error">30</span>
+</div>
+</div>
+</td>
+<td class="py-2 px-sm text-right text-on-surface-variant text-[11px]">Il y a 1 min</td>
+</tr>
+<!-- Row 3: Warning -->
+<tr class="hover:bg-surface-container-high cursor-pointer group transition-colors">
+<td class="py-2 px-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-tertiary-container text-[18px]" style="font-variation-settings: 'FILL' 0;">dns</span>
+<span class="font-medium text-on-surface">SRV-DB-01</span>
+</div>
+</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant text-[11px]">
+<div>10.0.10.50</div>
+<div class="text-[9px] opacity-70">11:22:33:44:55:66</div>
+</td>
+<td class="py-2 px-sm text-on-surface-variant">Ubuntu 22.04 LTS</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant">45d 8h</td>
+<td class="py-2 px-sm">
+<div class="flex justify-center">
+<div class="relative w-6 h-6 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 24 24">
+<circle cx="12" cy="12" fill="none" r="10" stroke="var(--color-outline-variant)" stroke-width="2"></circle>
+<circle cx="12" cy="12" fill="none" r="10" stroke="#d37768" stroke-dasharray="62.8" stroke-dashoffset="21.98" stroke-width="2"></circle>
+</svg>
+<span class="absolute text-[8px] font-bold text-tertiary-container">65</span>
+</div>
+</div>
+</td>
+<td class="py-2 px-sm text-right text-on-surface-variant text-[11px]">Il y a 5 min</td>
+</tr>
+<!-- Row 4: Healthy -->
+<tr class="hover:bg-surface-container-high cursor-pointer group transition-colors">
+<td class="py-2 px-sm">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 0;">switch</span>
+<span class="font-medium text-on-surface">DIST-SW-A</span>
+</div>
+</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant text-[11px]">
+<div>10.0.5.1</div>
+<div class="text-[9px] opacity-70">AA:BB:CC:DD:EE:FF</div>
+</td>
+<td class="py-2 px-sm text-on-surface-variant">ArubaOS-CX 10.08</td>
+<td class="py-2 px-sm font-data-mono text-on-surface-variant">120d 2h</td>
+<td class="py-2 px-sm">
+<div class="flex justify-center">
+<div class="relative w-6 h-6 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 24 24">
+<circle cx="12" cy="12" fill="none" r="10" stroke="var(--color-outline-variant)" stroke-width="2"></circle>
+<circle cx="12" cy="12" fill="none" r="10" stroke="#3da186" stroke-dasharray="62.8" stroke-dashoffset="1.25" stroke-width="2"></circle>
+</svg>
+<span class="absolute text-[8px] font-bold text-primary-container">98</span>
+</div>
+</div>
+</td>
+<td class="py-2 px-sm text-right text-on-surface-variant text-[11px]">Il y a 1 min</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</main>
+<!-- Side Panel (Device Details) - Hidden by default, shown for FW-EXT-02 -->
+<aside class="fixed top-[56px] right-0 h-[calc(100vh-56px)] w-[360px] bg-surface-container-low shadow-[-8px_0_16px_rgba(0,0,0,0.4)] border-l border-outline-variant z-40 transform translate-x-0 transition-transform duration-300 flex flex-col overflow-hidden">
+<!-- Header -->
+<div class="p-sm flex justify-between items-start border-b border-outline-variant bg-surface-container">
+<div class="flex gap-sm">
+<div class="w-10 h-10 rounded bg-error/10 flex items-center justify-center border border-error/30 mt-1">
+<span class="material-symbols-outlined text-error text-[24px]" style="font-variation-settings: 'FILL' 1;">security</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">FW-EXT-02</h3>
+<div class="flex items-center gap-xs mt-0.5">
+<span class="inline-block w-2 h-2 rounded-full bg-error animate-pulse"></span>
+<span class="font-label-caps text-label-caps text-error">CRITIQUE</span>
+</div>
+</div>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 0;">close</span>
+</button>
+</div>
+<!-- Content -->
+<div class="flex-1 overflow-y-auto p-sm space-y-md">
+<!-- Quick Stats -->
+<div class="bg-surface-container rounded border border-outline-variant/50 p-sm">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-2">IDENTIFICATION</h4>
+<div class="grid grid-cols-2 gap-y-2 gap-x-4 font-body-sm text-body-sm">
+<div>
+<span class="text-on-surface-variant text-[11px] block">Modèle</span>
+<span class="text-on-surface font-medium">PA-3220</span>
+</div>
+<div>
+<span class="text-on-surface-variant text-[11px] block">Numéro de série</span>
+<span class="text-on-surface font-data-mono">0123456789X</span>
+</div>
+<div>
+<span class="text-on-surface-variant text-[11px] block">Localisation</span>
+<span class="text-on-surface">Datacenter Paris - Rack 04</span>
+</div>
+<div>
+<span class="text-on-surface-variant text-[11px] block">Rôle</span>
+<span class="text-on-surface">Pare-feu Périmétrique</span>
+</div>
+</div>
+</div>
+<!-- Metric Sparklines -->
+<div class="bg-surface-container rounded border border-outline-variant/50 p-sm">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-3">PERFORMANCES (24H)</h4>
+<div class="mb-3">
+<div class="flex justify-between items-end mb-1">
+<span class="font-body-sm text-body-sm text-on-surface text-[12px]">CPU Load</span>
+<span class="font-data-mono text-error font-bold text-[14px]">94%</span>
+</div>
+<div class="h-8 w-full border-b border-l border-outline-variant relative flex items-end">
+<!-- Simple CSS Sparkline representation -->
+<div class="w-[10%] h-[30%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[40%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[35%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[45%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[50%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[60%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[75%] bg-error/80 ml-[1px]"></div>
+<div class="w-[10%] h-[85%] bg-error/80 ml-[1px]"></div>
+<div class="w-[10%] h-[98%] bg-error/80 ml-[1px]"></div>
+<div class="w-[10%] h-[94%] bg-error/80 ml-[1px]"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-end mb-1">
+<span class="font-body-sm text-body-sm text-on-surface text-[12px]">Mémoire</span>
+<span class="font-data-mono text-tertiary-container font-bold text-[14px]">78%</span>
+</div>
+<div class="h-8 w-full border-b border-l border-outline-variant relative flex items-end">
+<div class="w-[10%] h-[60%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[62%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[65%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[64%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[68%] bg-primary/40 ml-[1px]"></div>
+<div class="w-[10%] h-[70%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[72%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[75%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[79%] bg-tertiary-container/60 ml-[1px]"></div>
+<div class="w-[10%] h-[78%] bg-tertiary-container/60 ml-[1px]"></div>
+</div>
+</div>
+</div>
+<!-- Security Context -->
+<div class="bg-surface-container rounded border border-outline-variant/50 p-sm">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-3 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-error" style="font-variation-settings: 'FILL' 1;">warning</span>
+                    ANOMALIES DE SÉCURITÉ
+                </h4>
+<div class="space-y-2">
+<div class="bg-error/10 border border-error/20 p-2 rounded flex gap-2 items-start">
+<span class="material-symbols-outlined text-error text-[16px] mt-0.5" style="font-variation-settings: 'FILL' 0;">bolt</span>
+<div>
+<div class="font-body-sm text-body-sm text-on-surface font-medium text-[12px]">DDoS Suspecté (Port 443)</div>
+<div class="font-data-mono text-on-surface-variant text-[10px]">Il y a 15 min - Règle de blocage automatique échouée</div>
+</div>
+</div>
+<div class="bg-tertiary-container/10 border border-tertiary-container/20 p-2 rounded flex gap-2 items-start">
+<span class="material-symbols-outlined text-tertiary-container text-[16px] mt-0.5" style="font-variation-settings: 'FILL' 0;">vpn_key</span>
+<div>
+<div class="font-body-sm text-body-sm text-on-surface font-medium text-[12px]">Échecs d'authentification admin multiples</div>
+<div class="font-data-mono text-on-surface-variant text-[10px]">Il y a 4h - Source: 185.xxx.xxx.xxx</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Automation / Backups -->
+<div class="bg-surface-container rounded border border-outline-variant/50 p-sm">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant mb-3">NETDEVOPS &amp; SAUVEGARDES</h4>
+<div class="flex justify-between items-center py-1 border-b border-outline-variant/50">
+<span class="font-body-sm text-body-sm text-on-surface">Dernière sauvegarde config</span>
+<span class="flex items-center gap-1 text-primary text-[12px]">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 0;">check_circle</span>
+                        Aujourd'hui, 02:00
+                    </span>
+</div>
+<div class="flex justify-between items-center py-1 mt-1">
+<span class="font-body-sm text-body-sm text-on-surface">Audit de conformité</span>
+<span class="flex items-center gap-1 text-error text-[12px]">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 0;">error</span>
+                        Échec (OS obsolète)
+                    </span>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="p-sm border-t border-outline-variant bg-surface-container">
+<button class="w-full bg-secondary-container/20 border border-secondary-container text-secondary py-2 rounded font-body-sm text-body-sm font-medium flex items-center justify-center gap-xs hover:bg-secondary-container/40 transition-colors">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 0;">terminal</span>
+                Ouvrir un terminal SSH
+            </button>
+</div>
+</aside>
+<!-- Floating AI Assistant -->
+<button class="fixed bottom-lg right-lg w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform z-50">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 0;">psychology</span>
+</button>
+</body></html>
