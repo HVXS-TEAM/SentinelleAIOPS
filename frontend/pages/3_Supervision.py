@@ -23,6 +23,10 @@ from components import (
 )
 
 # ── 1. BOOTSTRAP ──────────────────────────────────────────────────────────────
+# ── Garde d'authentification ─────────────────────────────────────────────────
+if not st.session_state.get("authenticated", False):
+    st.switch_page("app.py")
+
 page_bootstrap(
     active="Supervision",
     page_title="Supervision & Analyses Prédictives",

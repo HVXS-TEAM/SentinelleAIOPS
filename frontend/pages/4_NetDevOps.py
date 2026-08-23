@@ -16,6 +16,10 @@ from page_template import page_bootstrap
 from components import score_badge, finding_item, code_diff, card
 
 # ── 1. BOOTSTRAP ──────────────────────────────────────────────────────────────
+# ── Garde d'authentification ─────────────────────────────────────────────────
+if not st.session_state.get("authenticated", False):
+    st.switch_page("app.py")
+
 page_bootstrap(
     active="NetDevOps",
     page_title="NetDevOps Automation",

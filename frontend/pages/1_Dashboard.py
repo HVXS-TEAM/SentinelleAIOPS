@@ -17,6 +17,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from page_template import page_bootstrap
 from components import badge, mono, alert_card
 
+# ── Garde d'authentification ─────────────────────────────────────────────────
+if not st.session_state.get("authenticated", False):
+    st.switch_page("app.py")
+
 page_bootstrap(
     active="Dashboard",
     page_title="Dashboard Opérationnel",

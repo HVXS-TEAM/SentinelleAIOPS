@@ -15,6 +15,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from page_template import page_bootstrap
 
 # ── 1. BOOTSTRAP ──────────────────────────────────────────────────────────────
+# ── Garde d'authentification ─────────────────────────────────────────────────
+if not st.session_state.get("authenticated", False):
+    st.switch_page("app.py")
+
 page_bootstrap(
     active="Rapports",
     page_title="Administration & Rapports",

@@ -185,15 +185,9 @@ if not st.session_state.authenticated:
 # REDIRECTION APRÈS AUTHENTIFICATION → Dashboard
 # ══════════════════════════════════════════════════════════════════════════════
 else:
-    # Recharge theme.css + sidebar uniquement une fois authentifié
-    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
-    from components import load_theme, badge, mono
-    from page_template import page_bootstrap
-
-    page_bootstrap(active="Dashboard")
-    st.markdown(
-        f"Bienvenue, {mono(st.session_state.username)} "
-        f"| Rôle : {badge(st.session_state.role, 'healthy')}",
-        unsafe_allow_html=True,
-    )
-    st.markdown("👈 Sélectionnez un module dans le menu latéral pour naviguer.")
+    # L'utilisateur est authentifié : on le redirige immédiatement vers le
+    # Dashboard. st.switch_page() charge la page cible avec sa propre
+    # st.set_page_config() (layout="wide", sidebar ouverte) — c'est la seule
+    # façon d'avoir simultanément la page de connexion en layout="centered"
+    # et les pages applicatives en layout="wide".
+    st.switch_page("pages/1_Dashboard.py")
