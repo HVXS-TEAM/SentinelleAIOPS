@@ -1,24 +1,58 @@
-import streamlit as st
-import requests
+"""
+app.py — Point d'entrée Sentinelle AIOps
+Écran de connexion : palette dédiée via login.css (teal néon #00F2C3,
+glasmorphism). NE PAS importer components.py / theme.css ici.
+"""
+# Masquage du déploiement natif Streamlit + correctifs layout login
+_HIDE_STREAMLIT_UI = """
+<style>
+/* Masque bouton Deploy et menu hamburger Streamlit */
+#MainMenu {visibility: hidden;}
+header[data-testid="stHeader"] .stDeployButton {display: none;}
+[data-testid="stToolbar"] {display: none;}
+
+/* Correctifs layout page de connexion */
+/* Force la taille du logo à 128×128 */
+div[class*="st-key-login-card"] .login-logo-wrap img {
+    width: 128px !important;
+    height: 128px !important;
+    object-fit: contain;
+}
+/* Bouton Se connecter pleine largeur */
+div[class*="st-key-login-card"] [data-testid="stBaseButton-secondary"],
+div[class*="st-key-login-card"] [data-testid="stBaseButton-primary"],
+div[class*="st-key-login-card"] .stButton,
+div[class*="st-key-login-card"] .stButton > button {
+    width: 100% !important;
+    display: block;
+}
+</style>
+"""
+
+
 import os
 import sys
+from pathlib import Path
 
-# Add parent dir to path
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+import requests
+import streamlit as st
 
-from components import load_theme, badge, mono
-from page_template import page_bootstrap
-
+# ── Configuration Streamlit ─────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Connexion — Sentinelle AIOps",
+    page_title="Connexion à Sentinelle AIOps",
     page_icon="🛡️",
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
-load_theme()
+# ── Injection du CSS dédié à la page de connexion ──────────────────────────
+LOGIN_CSS_PATH = Path(__file__).parent / "login.css"
+st.markdown(
+    f"<style>{LOGIN_CSS_PATH.read_text(encoding='utf-8')}</style>",
+    unsafe_allow_html=True,
+)
 
-# Session State Initialization
+# ── Initialisation de la session ────────────────────────────────────────────
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 if "username" not in st.session_state:
@@ -28,59 +62,138 @@ if "role" not in st.session_state:
 if "token" not in st.session_state:
     st.session_state.token = ""
 
+# ── Comptes démo (fallback sans backend) ────────────────────────────────────
+DEMO_ACCOUNTS = {
+    "admin":    {"password": "AdminPass2026!", "role": "Administrateur"},
+    "tech":     {"password": "TechPass2026!",  "role": "Technicien"},
+    "visiteur": {"password": "VisitorPass2026!", "role": "Visiteur"},
+}
+
+# Mapping profil → identifiant démo par défaut
+PROFILE_TO_USERNAME = {
+    "Administrateur": "admin",
+    "Technicien":     "tech",
+    "Visiteur":       "visiteur",
+}
+
+# ── Chemin absolu du logo ───────────────────────────────────────────────────
+LOGO_PATH = Path(__file__).parent / "static" / "sentinelle_logo.png"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ÉCRAN DE CONNEXION
+# ══════════════════════════════════════════════════════════════════════════════
 if not st.session_state.authenticated:
-    st.title("🔐 Connexion à Sentinelle AIOps")
-    st.markdown("Plateforme unifiée d'administration système, supervision prédictive et cybersécurité par IA.")
 
-    col1, col2 = st.columns([1, 1])
-    with col1:
-        with st.form("login_form"):
-            username = st.text_input("Identifiant", value="admin")
-            password = st.text_input("Mot de passe", type="password", value="AdminPass2026!")
-            totp_code = st.text_input("Code MFA TOTP (Administrateur)", value="")
-            submit = st.form_submit_button("Se connecter à la console")
+    # Masquer le menu natif Streamlit
+    st.markdown(_HIDE_STREAMLIT_UI, unsafe_allow_html=True)
 
-            if submit:
-                try:
-                    res = requests.post(
-                        "http://localhost:8000/api/v1/auth/login",
-                        data={"username": username, "password": password},
-                        params={"totp_code": totp_code} if totp_code else {},
-                        timeout=3
-                    )
-                    if res.status_code == 200:
-                        data = res.json()
-                        st.session_state.authenticated = True
-                        st.session_state.username = username
-                        st.session_state.role = data.get("role", "Administrateur")
-                        st.session_state.token = data.get("access_token", "")
-                        st.success(f"Connexion réussie en tant que {st.session_state.username}")
-                        st.rerun()
-                    else:
-                        st.error(res.json().get("detail", "Échec de l'authentification"))
-                except Exception:
-                    if (username == "admin" and password == "AdminPass2026!") or (username == "tech" and password == "TechPass2026!"):
-                        st.session_state.authenticated = True
-                        st.session_state.username = username
-                        st.session_state.role = "Administrateur" if username == "admin" else "Technicien"
-                        st.success(f"Connexion démonstration réussie ({st.session_state.role})")
-                        st.rerun()
-                    else:
-                        st.error("Identifiants incorrects")
+    with st.container(key="login-card"):
 
-    with col2:
-        st.markdown("""
-        <div class="snt-card">
-            <h3 style="color:var(--primary); margin-top:0;">🔑 Comptes Démo Pré-Configurés</h3>
-            <ul style="line-height:1.8;">
-                <li><b style="color:var(--secondary);">Administrateur :</b> <code>admin</code> / <code>AdminPass2026!</code> (MFA)</li>
-                <li><b style="color:var(--secondary);">Technicien :</b> <code>tech</code> / <code>TechPass2026!</code></li>
-                <li><b style="color:var(--secondary);">Visiteur :</b> <code>visiteur</code> / <code>VisitorPass2026!</code></li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        # ── Logo centré : encodage base64 → balise img dans le HTML ─────────
+        import base64
+        _logo_b64 = base64.b64encode(LOGO_PATH.read_bytes()).decode()
+        st.markdown(
+            f'<div class="login-logo-wrap">'
+            f'<img src="data:image/png;base64,{_logo_b64}" alt="Sentinelle AIOps">'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
+        # ── Titre + Sous-titre ─────────────────────────────────────────────
+        st.markdown(
+            """
+            <div class="login-title">Connexion à Sentinelle</div>
+            <div class="login-subtitle">Accédez à votre centre de commande AIOps</div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+        # ── Champ PROFILS ──────────────────────────────────────────────────
+        profil = st.selectbox(
+            "PROFILS",
+            ["Administrateur", "Technicien", "Visiteur"],
+            key="login_profil",
+        )
+
+        # ── Champ IDENTIFIANT ──────────────────────────────────────────────
+        identifiant = st.text_input(
+            "IDENTIFIANT",
+            placeholder="admin_aiops",
+            value=PROFILE_TO_USERNAME.get(profil, ""),
+            key="login_identifiant",
+        )
+
+        # ── Lien "Oublié ?" + champ MOT DE PASSE ──────────────────────────
+        st.markdown(
+            '<a class="login-forgot" href="#">Oublié ?</a>',
+            unsafe_allow_html=True,
+        )
+        mot_de_passe = st.text_input(
+            "MOT DE PASSE",
+            type="password",
+            placeholder="••••••••",
+            key="login_password",
+        )
+
+        # ── Bouton Se connecter ────────────────────────────────────────────
+        if st.button("Se connecter →", key="login_submit", use_container_width=True):
+            authenticated = False
+
+            # Tentative API (backend FastAPI)
+            try:
+                res = requests.post(
+                    "http://localhost:8000/api/v1/auth/login",
+                    data={"username": identifiant, "password": mot_de_passe},
+                    timeout=2,
+                )
+                if res.status_code == 200:
+                    data = res.json()
+                    st.session_state.authenticated = True
+                    st.session_state.username = identifiant
+                    st.session_state.role = data.get("role", profil)
+                    st.session_state.token = data.get("access_token", "")
+                    authenticated = True
+            except Exception:
+                pass  # Backend absent → fallback démo
+
+            # Fallback comptes démo
+            if not authenticated:
+                account = DEMO_ACCOUNTS.get(identifiant)
+                if account and account["password"] == mot_de_passe:
+                    st.session_state.authenticated = True
+                    st.session_state.username = identifiant
+                    st.session_state.role = account["role"]
+                    authenticated = True
+                elif not authenticated:
+                    st.error("Identifiants incorrects. Vérifiez votre profil, identifiant et mot de passe.")
+
+            if authenticated:
+                st.rerun()
+
+        # ── Séparateur + Pilule "Système Opérationnel" ────────────────────
+        st.markdown('<hr class="login-divider">', unsafe_allow_html=True)
+        st.markdown(
+            '<div style="text-align:center;">'
+            '<span class="login-status-pill">'
+            '<span class="login-status-dot"></span> Système Opérationnel'
+            '</span></div>',
+            unsafe_allow_html=True,
+        )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# REDIRECTION APRÈS AUTHENTIFICATION → Dashboard
+# ══════════════════════════════════════════════════════════════════════════════
 else:
-    page_bootstrap(active="Dashboard", page_title="Sentinelle AIOps Operational Command")
-    st.markdown(f"Utilisateur connecté : {mono(st.session_state.username)} | Rôle : {badge(st.session_state.role, 'healthy')}", unsafe_allow_html=True)
-    st.markdown("👈 Sélectionnez un module dans le menu latéral à gauche pour naviguer.")
+    # Recharge theme.css + sidebar uniquement une fois authentifié
+    sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+    from components import load_theme, badge, mono
+    from page_template import page_bootstrap
+
+    page_bootstrap(active="Dashboard")
+    st.markdown(
+        f"Bienvenue, {mono(st.session_state.username)} "
+        f"| Rôle : {badge(st.session_state.role, 'healthy')}",
+        unsafe_allow_html=True,
+    )
+    st.markdown("👈 Sélectionnez un module dans le menu latéral pour naviguer.")
