@@ -16,12 +16,16 @@ def page_bootstrap(
     Initialise la configuration Streamlit, le thème CSS et le layout commun (sidebar + top header).
     À appeler impérativement tout en haut de chaque page.
     """
-    st.set_page_config(
-        page_title=f"{page_title} — Sentinelle AIOps",
-        page_icon=page_icon,
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
+    try:
+        st.set_page_config(
+            page_title=f"{page_title} — Sentinelle AIOps",
+            page_icon=page_icon,
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+    except Exception:
+        pass
     load_theme()
     sidebar_nav(active=active)
     top_header(search_placeholder=search_placeholder, page_title=header_title)
+

@@ -12,10 +12,16 @@ contenu, utiliser st.container(key="...") : Streamlit génère alors une
 vraie classe CSS .st-key-<key> sur le conteneur réel. C'est la seule
 technique utilisée ici pour les cartes et la nav — ne pas réintroduire
 le pattern div-ouvrante/div-fermante sur deux appels séparés.
+
+THÈME AUTO (v2) : le bouton clair/sombre manuel (🌙/☀️) est supprimé.
+load_theme() applique automatiquement la palette claire de 6h à 18h,
+sombre le reste du temps (_auto_theme()). Les emojis 🌙/☀️ natifs de
+Streamlit sont également masqués par CSS dans theme.css.
 """
 
 from pathlib import Path
 from itertools import count
+import datetime
 import streamlit as st
 
 THEME_CSS_PATH = Path(__file__).parent / "theme.css"
@@ -39,9 +45,6 @@ ICONS = {
 }
 
 # (label affiché, chemin réel du fichier sous pages/, clé de ICONS ci-dessus)
-# ⚠️ ANTIGRAVITY : remplace le champ "page" de chaque tuple par le VRAI
-# chemin du fichier correspondant dans le dossier pages/ de ce projet
-# (respecte la casse exacte).
 NAV_ITEMS = [
     ("Dashboard", "pages/1_Dashboard.py", "dashboard"),
     ("Supervision", "pages/3_Supervision.py", "supervision"),
@@ -52,26 +55,63 @@ NAV_ITEMS = [
     ("Assistant IA", "pages/7_Assistant_IA.py", "assistant"),
 ]
 
+# ── Notifications par défaut (simulées) ──────────────────────────────────────
+_DEFAULT_NOTIFICATIONS = [
+    "🔴 FW-EXT-02 — CPU critique 94% (il y a 15 min)",
+    "🟠 db-cluster-01 — Saturation disque prévue Jeu. 14 Nov",
+    "🟡 CORE-RTR-01 — Alerte configuration driftée",
+    "🟢 Sauvegarde quotidienne réussie (02:00)",
+]
+
+
+def _auto_theme() -> str:
+    """Retourne 'light' ou 'dark' selon l'heure actuelle du serveur.
+    Clair de 6h à 18h, sombre le reste du temps — 100% automatique, sans
+    bouton ni préférence manuelle (remplace l'ancien toggle 🌙/☀️)."""
+    hour = datetime.datetime.now().hour
+    return "light" if 6 <= hour < 18 else "dark"
+
+
+# Surcharges CSS pour le thème clair — injectées par load_theme() si
+# _auto_theme() retourne "light". Tous les tokens --surface-* et
+# --on-surface* sont remappés sur des valeurs claires conformes à
+# DESIGN.md pour ne pas casser les icônes et textes sur fond blanc.
+LIGHT_MODE_OVERRIDES = """
+:root {
+    --surface: #f5f7f6;
+    --surface-dim: #d8dbd9;
+    --surface-bright: #f5f7f6;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #eff2f0;
+    --surface-container: #e9ece9;
+    --surface-container-high: #e3e6e3;
+    --surface-container-highest: #dde0dd;
+    --on-surface: #171d1a;
+    --on-surface-variant: #3f4945;
+    --outline: #6f7975;
+    --outline-variant: #bfc9c4;
+    --background: #f5f7f6;
+    --on-background: #171d1a;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+}
+"""
+
 
 def load_theme() -> None:
-    """Injecte theme.css une seule fois par page. À appeler juste après
+    """Injecte theme.css une seule fois par page, puis applique
+    automatiquement la palette claire si l'heure actuelle correspond à
+    la tranche "jour" (voir _auto_theme()). À appeler juste après
     st.set_page_config()."""
     css = THEME_CSS_PATH.read_text(encoding="utf-8")
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    if _auto_theme() == "light":
+        st.markdown(f"<style>{LIGHT_MODE_OVERRIDES}</style>", unsafe_allow_html=True)
 
 
 def sidebar_nav(active: str) -> None:
     """Navigation NATIVE Streamlit (st.page_link) enveloppée dans de vrais
-    st.container(key=...), avec icône SVG inline à gauche du label (pas
-    d'icône native page_link — on affiche notre propre SVG via st.markdown
-    dans une sous-colonne étroite, à côté du st.page_link qui ne porte que
-    le label). `active` doit correspondre à un label de NAV_ITEMS.
-
-    La sidebar se réduit automatiquement en mode "icônes seules" (72px)
-    quand la souris n'est pas dessus, et s'élargit (240px) au survol —
-    comportement 100% CSS (voir theme.css), aucun JS. Le bouton 📌 permet
-    de l'épingler en position ouverte en permanence (utile en navigation
-    au clavier/tactile, où il n'y a pas de survol)."""
+    st.container(key=...), avec icône SVG inline à gauche du label.
+    `active` doit correspondre à un label de NAV_ITEMS."""
     with st.sidebar:
         if "sidebar_pinned" not in st.session_state:
             st.session_state.sidebar_pinned = False
@@ -125,20 +165,29 @@ def sidebar_nav(active: str) -> None:
                     st.page_link(page_path, label=label)
 
 
-def top_header(search_placeholder: str = "Rechercher...", page_title: str | None = None) -> None:
-    """Barre supérieure : recherche, notifications, mode sombre —
-    enveloppée dans un vrai st.container(key=...) pour que le style
-    sticky/flex de theme.css s'applique réellement au bon élément.
-    page_title (optionnel) : affiche un titre centré dans le bandeau
-    (ex. "Sentinelle AIOps") — à ne passer QUE sur les écrans dont le
-    screen.png de référence montre effectivement ce titre centré dans le
-    header (ce n'est pas le cas de tous les écrans, vérifie au cas par
-    cas plutôt que de l'ajouter partout par défaut)."""
+def top_header(
+    search_placeholder: str = "Rechercher...",
+    page_title: str | None = None,
+    notifications: list[str] | None = None,
+) -> None:
+    """Barre supérieure : recherche + cloche notifications (st.popover réel).
+
+    Le thème clair/sombre est 100% automatique selon l'heure (load_theme()).
+    Le bouton 🌙/☀️ natif Streamlit est masqué par CSS dans theme.css.
+
+    La cloche 🔔 est un vrai st.popover() — cliquable, qui ouvre un menu
+    déroulant listant les alertes récentes. Aucune image, aucun emoji inerte.
+
+    page_title (optionnel) : titre centré dans le bandeau.
+    notifications (optionnel) : liste de str à afficher dans le popover
+        (fallback sur _DEFAULT_NOTIFICATIONS si non fourni).
+    """
     with st.container(key="sentinelle-header"):
         if page_title:
-            col_search, col_title, col_icons = st.columns([2, 2, 1])
+            col_search, col_title, col_notif = st.columns([3, 2, 1])
         else:
-            col_search, col_icons = st.columns([3, 1])
+            col_search, col_notif = st.columns([5, 1])
+
         with col_search:
             st.text_input(
                 "Recherche",
@@ -146,6 +195,7 @@ def top_header(search_placeholder: str = "Rechercher...", page_title: str | None
                 label_visibility="collapsed",
                 key="sentinelle_header_search",
             )
+
         if page_title:
             with col_title:
                 st.markdown(
@@ -153,11 +203,39 @@ def top_header(search_placeholder: str = "Rechercher...", page_title: str | None
                     f'color:var(--on-surface);">{page_title}</div>',
                     unsafe_allow_html=True,
                 )
-        with col_icons:
-            st.markdown(
-                '<div style="text-align:right;font-size:20px;">🔔 &nbsp; 🌙</div>',
-                unsafe_allow_html=True,
-            )
+
+        with col_notif:
+            # ── POPOVER NOTIFICATIONS — vrai st.popover, pas un emoji statique ──
+            items = notifications or _DEFAULT_NOTIFICATIONS
+            unread_count = len(items)
+
+            with st.popover(
+                f"🔔 {unread_count}",
+                help="Notifications récentes",
+                use_container_width=False,
+            ):
+                st.markdown(
+                    '<div style="font-family:var(--font-mono);font-size:11px;'
+                    'text-transform:uppercase;letter-spacing:0.06em;'
+                    'color:var(--on-surface-variant);margin-bottom:10px;">'
+                    "NOTIFICATIONS RÉCENTES</div>",
+                    unsafe_allow_html=True,
+                )
+                for item in items:
+                    # Chaque alerte dans sa propre ligne stylée
+                    st.markdown(
+                        f'<div style="padding:6px 0;border-bottom:1px solid '
+                        f'var(--border-subtle);font-size:13px;color:var(--on-surface);">'
+                        f"{item}</div>",
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(
+                    '<div style="margin-top:10px;text-align:center;">'
+                    '<span style="font-family:var(--font-mono);font-size:11px;'
+                    'color:var(--on-surface-variant);">Voir toutes les alertes →</span>'
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
 
 
 def card(title: str | None = None, key: str | None = None):
@@ -225,19 +303,10 @@ def finding_item(title: str, subtitle: str, level: str = "critical", active: boo
 def code_diff(lines: list[tuple[str, str | None]]) -> None:
     """Affiche un bloc de code monospace avec coloration diff optionnelle
     par ligne. `lines` = liste de tuples (texte, classe) où classe ∈
-    {None, "removed", "added"}. Exemple :
-
-        code_diff([
-            ("line vty 0 4", None),
-            (" login", None),
-            (" password cisco", "removed"),
-            ("snmp-server community public RO", "removed"),
-        ])
-    """
+    {None, "removed", "added"}."""
     rows = ""
     for text, cls in lines:
         css_class = f"code-line-{cls}" if cls else "code-line"
-        # échappement minimal pour éviter la casse du HTML par le contenu
         safe = text.replace("<", "&lt;").replace(">", "&gt;")
         rows += f'<div class="{css_class}">{safe}</div>'
     st.markdown(f'<div class="code-diff-block">{rows}</div>', unsafe_allow_html=True)
@@ -254,11 +323,7 @@ def topology_graph(
     """Graphe de topologie réseau statique en SVG.
     nodes: liste de dict {id, label, x, y, status} — x/y en coordonnées
     du viewBox (0..view_w / 0..view_h), status ∈ {"healthy","warning","critical"}.
-    edges: liste de tuples (id_a, id_b) reliés par une ligne.
-    width/height sont acceptés en alias de view_w/view_h (certains appels
-    utilisent ces noms). Les positions sont à fixer à la main pour
-    correspondre à screen.png — ce n'est pas un layout algorithmique,
-    juste un rendu fidèle d'un graphe fixe."""
+    edges: liste de tuples (id_a, id_b) reliés par une ligne."""
     if width is not None:
         view_w = width
     if height is not None:
@@ -297,9 +362,7 @@ def topology_graph(
 
 
 def mini_bar_chart(values: list[float], colors: list[str] | None = None, height: int = 40) -> None:
-    """Petit graphique en barres (ex. CPU/Mémoire sur 24h). values : liste
-    de hauteurs relatives 0-100. colors : couleur par barre (sinon
-    couleur automatique teal/orange/rouge selon le seuil de la valeur)."""
+    """Petit graphique en barres (ex. CPU/Mémoire sur 24h)."""
     bars = ""
     for i, v in enumerate(values):
         h = max(4, min(100, v))
@@ -316,9 +379,7 @@ def mini_bar_chart(values: list[float], colors: list[str] | None = None, height:
 
 
 def alert_item(icon: str, title: str, subtitle: str) -> str:
-    """Item d'alerte/anomalie avec icône, titre et sous-texte (ex. "DDoS
-    Suspecté (Port 443)" / "Il y a 15 min - ..."). Retourne du HTML à
-    insérer via st.markdown(unsafe_allow_html=True)."""
+    """Item d'alerte/anomalie avec icône, titre et sous-texte."""
     return (
         f'<div class="alert-item">'
         f'<div class="alert-icon">{icon}</div>'
@@ -329,29 +390,18 @@ def alert_item(icon: str, title: str, subtitle: str) -> str:
 
 
 def alert_card(icon: str, title: str, subtitle: str) -> str:
-    """Carte d'alerte (utilisée sur le Dashboard). Implémentation
-    provisoire identique à alert_item() en attendant le screen.png du
-    Dashboard pour vérifier le rendu exact attendu — signale-le si le
-    style diffère de la maquette une fois comparé. Retourne du HTML à
-    insérer via st.markdown(unsafe_allow_html=True)."""
+    """Carte d'alerte (utilisée sur le Dashboard)."""
     return alert_item(icon, title, subtitle)
 
 
 def field(label: str, value: str, mono_value: bool = False) -> str:
-    """Paire label/valeur pour une grille d'identification (ex. "Modèle"
-    / "PA-3220"). mono_value=True affiche la valeur en police JetBrains
-    Mono (utile pour un numéro de série, une IP, un hash). Retourne du
-    HTML à insérer via st.markdown(unsafe_allow_html=True)."""
+    """Paire label/valeur pour une grille d'identification."""
     value_html = mono(str(value)) if mono_value else value
     return f'<div class="field-label">{label}</div><div class="field-value">{value_html}</div>'
 
 
 def radar_map(points: list[dict], view_w: int = 1000, view_h: int = 460, width: int | None = None, height: int | None = None) -> None:
-    """Carte radar (anneaux concentriques + points colorés) pour la vue
-    menaces globales. points: liste de dict {x, y, status} avec x/y en
-    coordonnées du viewBox et status ∈ {"critical", "anomaly"}.
-    width/height sont acceptés en alias de view_w/view_h (certains appels
-    utilisent ces noms)."""
+    """Carte radar (anneaux concentriques + points colorés) pour la vue menaces globales."""
     if width is not None:
         view_w = width
     if height is not None:
@@ -376,8 +426,7 @@ def radar_map(points: list[dict], view_w: int = 1000, view_h: int = 460, width: 
 
 
 def stat_tile(label: str, value: str, color: str = "var(--on-surface)") -> str:
-    """Petite tuile statistique (ex. "ACTIVE VECTORS" / "4"). Retourne du
-    HTML à insérer via st.markdown(unsafe_allow_html=True)."""
+    """Petite tuile statistique (ex. "ACTIVE VECTORS" / "4")."""
     return (
         f'<div class="stat-tile"><div class="stat-tile-label">{label}</div>'
         f'<div class="stat-tile-value" style="color:{color};">{value}</div></div>'
@@ -407,8 +456,7 @@ def donut_gauge(percent: float, label: str, size: int = 180, stroke: int = 14, c
 
 
 def progress_row(label: str, percent: float, color: str = "var(--primary)") -> None:
-    """Ligne label + pourcentage + barre de progression horizontale (ex.
-    "Identity & Access" / 92%)."""
+    """Ligne label + pourcentage + barre de progression horizontale."""
     st.markdown(
         f'<div class="progress-row">'
         f'<div class="progress-row-top"><span>{label}</span><span>{percent}%</span></div>'
@@ -419,9 +467,7 @@ def progress_row(label: str, percent: float, color: str = "var(--primary)") -> N
 
 
 def severity_pill(text: str, level: str = "medium") -> str:
-    """Badge de sévérité (CRITICAL/HIGH/MEDIUM). level ∈ {"critical",
-    "high", "medium"}. Retourne du HTML à insérer via
-    st.markdown(unsafe_allow_html=True)."""
+    """Badge de sévérité (CRITICAL/HIGH/MEDIUM)."""
     icon = {"critical": "⏱", "high": "⚠", "medium": "ℹ"}.get(level, "ℹ")
     return f'<span class="severity-pill severity-{level}">{icon} {text}</span>'
 
@@ -435,11 +481,8 @@ def trend_chart(
     view_w: int = 400,
     view_h: int = 140,
 ) -> None:
-    """Mini graphique de tendance : ligne pleine (historique) qui se
-    prolonge en ligne pointillée saumon (zone de prédiction), avec une
-    ligne verticale pointillée à la jonction et un fond légèrement plus
-    clair sur la zone de prédiction. threshold : ligne horizontale de
-    référence optionnelle (ex. 100 pour "100% Saturation")."""
+    """Mini graphique de tendance : ligne pleine (historique) prolongée en
+    ligne pointillée saumon (zone de prédiction)."""
     all_vals = history + forecast + ([threshold] if threshold is not None else [])
     vmin, vmax = min(all_vals), max(all_vals)
     vmax = vmax if vmax > vmin else vmin + 1
@@ -490,9 +533,7 @@ def trend_chart(
 
 
 def maintenance_item(name: str, severity_label: str, description: str, eta: str, color: str = "var(--predictive-accent)") -> str:
-    """Item de la liste "Urgence Maintenance" : bordure gauche colorée,
-    nom + badge de sévérité, description, ETA. Retourne du HTML à insérer
-    via st.markdown(unsafe_allow_html=True)."""
+    """Item de la liste "Urgence Maintenance" : bordure gauche colorée."""
     return (
         f'<div class="maint-item" style="border-left-color:{color};">'
         f'<div class="maint-item-top"><span class="maint-item-name">{name}</span>'

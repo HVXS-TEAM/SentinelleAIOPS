@@ -64,9 +64,10 @@ if "token" not in st.session_state:
 
 # ── Comptes démo (fallback sans backend) ────────────────────────────────────
 DEMO_ACCOUNTS = {
-    "admin":    {"password": "AdminPass2026!", "role": "Administrateur"},
-    "tech":     {"password": "TechPass2026!",  "role": "Technicien"},
-    "visiteur": {"password": "VisitorPass2026!", "role": "Visiteur"},
+    "admin":       {"password": "AdminPass2026!", "role": "Administrateur"},
+    "admin_aiops": {"password": "AdminPass2026!", "role": "Administrateur"},
+    "tech":        {"password": "TechPass2026!",  "role": "Technicien"},
+    "visiteur":    {"password": "VisitorPass2026!", "role": "Visiteur"},
 }
 
 # Mapping profil → identifiant démo par défaut

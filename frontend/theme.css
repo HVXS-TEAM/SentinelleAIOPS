@@ -5,10 +5,6 @@
    ========================================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Sans:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
-/* Pas d'import Material Symbols ici : les icônes utilisent la syntaxe
-   native Streamlit :material/nom: (st.page_link, st.markdown), qui gère
-   son propre chargement de police en interne — plus fiable que notre
-   ancien import CSS, qui échouait silencieusement. */
 
 :root {
     /* --- Couleurs (DESIGN.md > colors) --- */
@@ -60,10 +56,10 @@
 
     /* --- Shapes (DESIGN.md > rounded) --- */
     --radius-sm: 0.25rem;
-    --radius-md: 0.5rem;   /* boutons, inputs, petites cartes */
-    --radius-lg: 1rem;     /* cartes principales, modals */
+    --radius-md: 0.5rem;
+    --radius-lg: 1rem;
     --radius-xl: 1.5rem;
-    --radius-pill: 9999px; /* badges, tags uniquement */
+    --radius-pill: 9999px;
 
     /* --- Spacing (DESIGN.md > spacing) --- */
     --unit: 4px;
@@ -75,15 +71,12 @@
 
     --border-subtle: rgba(255, 255, 255, 0.08);
 
-    /* Couleurs de statut pour la topologie réseau (tons distincts des
-       badges pill existants, plus proches du screen.png Parc Informatique) */
+    /* Couleurs de statut pour la topologie réseau */
     --node-healthy: var(--primary);
     --node-warning: #e0a458;
     --node-critical: #c9695c;
 
-    /* Accent prédictif/critique (Supervision) — issu du DESIGN.md propre
-       à cet écran, distinct de --error et --tertiary déjà utilisés
-       ailleurs pour ne rien casser sur les écrans précédents. */
+    /* Accent prédictif/critique (Supervision) */
     --predictive-accent: #ffb4a7;
     --on-predictive-accent: #5a1a12;
 }
@@ -106,18 +99,26 @@ h1, h2, h3, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
     letter-spacing: -0.02em;
 }
 
-/* Toutes les données chiffrées / timestamps / hash / labels techniques
-   doivent porter la classe .mono (voir components.py) */
 .mono, code, .stCode {
     font-family: var(--font-mono) !important;
 }
 
-/* ---------- Navigation : items de sidebar_nav(), enveloppés dans de
-   vrais st.container(key="navitem-N"[-active]) — la classe .st-key-...
-   est générée par Streamlit sur le VRAI conteneur parent, donc les
-   sélecteurs descendants ci-dessous s'appliquent réellement (contrairement
-   à l'ancienne technique div ouvrante/fermante sur deux appels séparés,
-   qui ne créait aucune vraie relation parent-enfant). ---------- */
+/* ---------- Masquer le bouton thème natif Streamlit (🌙/☀️) ----------
+   Le thème est désormais 100% automatique via _auto_theme() dans
+   components.py — le bouton manuel n'a plus raison d'être affiché.
+   On cible tous les sélecteurs connus correspondant à ce bouton dans
+   les versions récentes de Streamlit (1.32+). ---------- */
+header[data-testid="stHeader"] button[title="View app in light mode"],
+header[data-testid="stHeader"] button[title="View app in dark mode"],
+header[data-testid="stHeader"] button[aria-label="View app in light mode"],
+header[data-testid="stHeader"] button[aria-label="View app in dark mode"],
+header[data-testid="stHeader"] [data-testid="baseButton-header"][title*="mode"],
+header[data-testid="stHeader"] [data-testid="stToolbar"] button:has(svg path[d*="M12"]),
+[data-testid="stToolbarActions"] button[kind="header"]:last-of-type {
+    display: none !important;
+}
+
+/* ---------- Navigation : items de sidebar_nav() ---------- */
 div[class*="st-key-navitem-"] {
     border-radius: 0 8px 8px 0;
     margin-bottom: 2px;
@@ -140,7 +141,6 @@ div[class*="st-key-navitem-"][class*="-active"] [data-testid="stPageLink"] p,
 div[class*="st-key-navitem-"][class*="-active"] [data-testid="stPageLink"] span {
     color: var(--primary) !important;
 }
-/* Icône SVG inline de la sidebar : grise par défaut, teal sur l'item actif */
 .nav-icon { color: var(--on-surface-variant); display: flex; align-items: center; }
 .nav-icon svg { width: 20px; height: 20px; display: block; }
 div[class*="st-key-navitem-"][class*="-active"] .nav-icon { color: var(--primary); }
@@ -149,20 +149,12 @@ div[class*="st-key-sentinelle-logo"] {
     padding: 8px 4px 24px 4px;
 }
 
-/* ---------- Masquer la navigation multipage NATIVE de Streamlit
-   (générée automatiquement à partir du dossier pages/) : sinon elle
-   s'affiche en plus de sidebar_nav() custom, d'où le doublon visible
-   en haut de la sidebar. ---------- */
+/* ---------- Masquer la navigation multipage NATIVE de Streamlit ---------- */
 section[data-testid="stSidebarNav"] {
     display: none;
 }
 
-/* ---------- Sidebar native masquée : on la restyle plutôt que de la
-   remplacer entièrement, pour rester compatible avec st.sidebar.
-   Repli automatique : 72px (icônes seules) par défaut, s'élargit à
-   var(--sidebar-width) au survol OU si épinglée (bouton 📌, cf.
-   sidebar_nav() dans components.py qui ajoute .sidebar-pinned-marker
-   quand st.session_state.sidebar_pinned est vrai). Pur CSS, aucun JS. ---------- */
+/* ---------- Sidebar : repli automatique (72px) / survol (260px) ---------- */
 section[data-testid="stSidebar"] {
     background-color: var(--surface-container-lowest);
     border-right: 1px solid var(--border-subtle);
@@ -176,8 +168,12 @@ section[data-testid="stSidebar"]:has(.sidebar-pinned-marker) {
     width: var(--sidebar-width) !important;
     min-width: var(--sidebar-width) !important;
 }
+section[data-testid="stSidebar"][aria-expanded="false"] {
+    width: 0px !important;
+    min-width: 0px !important;
+    border-right: none;
+}
 
-/* Labels et texte du logo masqués en mode replié, révélés au survol/épinglage */
 .sentinelle-logo-text,
 div[class*="st-key-navitem-"] [data-testid="stPageLink"] p {
     opacity: 0;
@@ -194,7 +190,6 @@ section[data-testid="stSidebar"]:has(.sidebar-pinned-marker) div[class*="st-key-
     max-width: 200px;
 }
 
-/* Bouton épingle 📌/📍 : compact, sans fond, toujours visible même replié */
 div[class*="st-key-sentinelle-logo"] .stButton > button {
     background: transparent;
     box-shadow: none;
@@ -207,41 +202,102 @@ section[data-testid="stSidebar"] .block-container {
     padding-top: var(--gutter);
 }
 
-/* ---------- Barre d'outils native Streamlit (Deploy / menu ⋮) :
-   on la laisse visible mais transparente et on force son passage
-   au-dessus (z-index) pour qu'elle ne soit jamais recouverte, et on
-   pousse le contenu de la page sous elle pour éviter le chevauchement
-   avec .sentinelle-header. ---------- */
+/* ---------- Barre native Streamlit (Deploy / menu ⋮) ----------
+   Fond unifié avec la page, z-index élevé pour rester au-dessus. */
 header[data-testid="stHeader"] {
     background-color: var(--surface);
     z-index: 999;
 }
 
-.stApp > header + div .block-container {
+/* ---------- Coller le bandeau sentinelle-header immédiatement sous
+   la barre native Streamlit, sans espace vide entre les deux.
+
+   STRATÉGIE : on annule tous les padding-top et margin-top qui
+   créent l'espace indésirable, à chaque niveau du DOM Streamlit
+   (stAppViewContainer > section.main > block-container). Le
+   st.container(key="sentinelle-header") est ensuite sticky top:0
+   pour coller à la toolbar native qui a déjà sa hauteur fixe. ---------- */
+
+/* Niveau 1 : conteneur principal de la zone de contenu */
+div[data-testid="stAppViewContainer"] > section.main {
     padding-top: 0 !important;
+    margin-top: 0 !important;
 }
 
-/* Header top bar custom (top_header()), enveloppé dans un vrai
-   st.container(key="sentinelle-header") : sticky sous la barre Streamlit,
-   au-dessus du contenu de la page. */
+/* Niveau 2 : bloc intermédiaire Streamlit */
+div[data-testid="stAppViewBlockContainer"],
+div[data-testid="stMainBlockContainer"] {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+}
+
+/* Niveau 3 : block-container final (padding natif Streamlit = 6rem top) */
+.main .block-container,
+section.main > div {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    transition: padding 0.2s ease;
+}
+
+/* Niveau 4 : header lui-même — offset négatif pour absorber
+   tout espace résiduel entre le haut du scroll-container et
+   notre header (certaines versions de Streamlit ajoutent 1-2px) */
 div[class*="st-key-sentinelle-header"] {
     position: sticky;
     top: 0;
     z-index: 100;
     display: flex;
     align-items: center;
-    padding: 12px var(--margin-desktop);
+    padding: 10px var(--margin-desktop);
     border-bottom: 1px solid var(--border-subtle);
     background-color: var(--surface);
-    margin: 0 -1rem 16px -1rem; /* compense le padding par défaut du block-container */
+    margin-top: -2px;        /* absorbe l'écart résiduel éventuel */
+    margin-bottom: 16px;
+    margin-left: -2rem;      /* compense le padding-left du block-container */
+    margin-right: -2rem;     /* compense le padding-right du block-container */
 }
 div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
     background-color: var(--surface-container-low);
     border-radius: var(--radius-pill);
 }
 
-/* ---------- Score badge (deux lignes : valeur + label), ex. "82% / CIS
-   SCORE" — utilisé sur les listes d'équipements/audits. ---------- */
+/* ---------- Popover Notifications — style du bouton déclencheur ----------
+   Le st.popover génère un bouton avec data-testid="stPopoverTrigger".
+   On le stylise en icône cloche discrète (fond transparent, pas de
+   bordure verte par défaut de Streamlit). */
+div[class*="st-key-sentinelle-header"] [data-testid="stPopoverTrigger"] > button {
+    background-color: transparent !important;
+    border: none !important;
+    color: var(--on-surface-variant) !important;
+    font-size: 16px !important;
+    padding: 6px 10px !important;
+    border-radius: var(--radius-md) !important;
+    box-shadow: none !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+div[class*="st-key-sentinelle-header"] [data-testid="stPopoverTrigger"] > button:hover {
+    background-color: var(--surface-container-high) !important;
+    color: var(--on-surface) !important;
+}
+
+/* Contenu du popover : fond sombre, style monospace */
+[data-testid="stPopover"] > div {
+    background-color: var(--surface-container-low) !important;
+    border: 1px solid var(--border-subtle) !important;
+    border-radius: var(--radius-md) !important;
+    min-width: 320px !important;
+    max-width: 400px !important;
+}
+
+/* ---------- Score badge ---------- */
 .score-badge {
     display: inline-block;
     text-align: center;
@@ -261,7 +317,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
     color: var(--primary);
 }
 
-/* ---------- Finding d'audit : bloc à bordure gauche colorée ---------- */
+/* ---------- Finding d'audit ---------- */
 .finding {
     border-left: 3px solid var(--outline-variant);
     padding: 4px 0 4px 12px;
@@ -301,7 +357,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
     color: var(--primary);
 }
 
-/* ---------- Topologie réseau (SVG statique) ---------- */
+/* ---------- Topologie réseau ---------- */
 .topology-svg { width: 100%; height: auto; display: block; }
 .topo-label {
     font-family: var(--font-mono);
@@ -310,7 +366,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
     fill: var(--on-surface);
 }
 
-/* ---------- Mini graphique en barres (perf 24h) ---------- */
+/* ---------- Mini graphique en barres ---------- */
 .mini-bar-chart { display: flex; align-items: flex-end; gap: 3px; }
 .mini-bar { flex: 1; border-radius: 2px 2px 0 0; min-height: 4px; }
 
@@ -329,7 +385,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
 .alert-title { font-weight: 600; font-size: 13px; color: var(--on-surface); }
 .alert-subtitle { font-size: 12px; color: var(--on-surface-variant); }
 
-/* ---------- Champ label/valeur (grille identification) ---------- */
+/* ---------- Champ label/valeur ---------- */
 .field-label {
     font-size: 11px;
     text-transform: uppercase;
@@ -339,7 +395,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
 }
 .field-value { font-weight: 600; color: var(--on-surface); margin-bottom: 12px; }
 
-/* ---------- Radar de menaces (anneaux + points) ---------- */
+/* ---------- Radar de menaces ---------- */
 .radar-wrap {
     position: relative;
     background-image: radial-gradient(var(--outline-variant) 1px, transparent 1px);
@@ -390,7 +446,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
 }
 .progress-fill { height: 100%; border-radius: 3px; }
 
-/* ---------- Badge de sévérité (CRITICAL/HIGH/MEDIUM) ---------- */
+/* ---------- Badge de sévérité ---------- */
 .severity-pill {
     display: inline-flex; align-items: center; gap: 4px;
     padding: 2px 10px; border-radius: 4px;
@@ -401,7 +457,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
 .severity-high { background: rgba(224, 164, 88, 0.15); color: var(--node-warning); border-color: rgba(224, 164, 88, 0.4); }
 .severity-medium { background: rgba(129, 208, 248, 0.12); color: var(--secondary); border-color: rgba(129, 208, 248, 0.35); }
 
-/* ---------- Graphique de tendance (historique + prédiction) ---------- */
+/* ---------- Graphique de tendance ---------- */
 .trend-svg { width: 100%; height: auto; display: block; }
 .trend-threshold-label {
     font-family: var(--font-mono);
@@ -429,7 +485,7 @@ div[class*="st-key-sentinelle-header"] [data-testid="stTextInput"] input {
 .maint-item-desc { font-size: 13px; color: var(--on-surface-variant); margin-bottom: 6px; }
 .maint-item-eta { font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant); }
 
-/* ---------- Sliders de seuil (st.slider natif stylé) ---------- */
+/* ---------- Sliders de seuil ---------- */
 div[data-testid="stSlider"] [role="slider"] {
     background-color: var(--predictive-accent) !important;
     border-color: var(--predictive-accent) !important;
@@ -453,30 +509,24 @@ div[data-testid="stSlider"] > div > div > div {
     filter: brightness(1.08);
     color: var(--on-primary);
 }
-
-/* Bouton "ghost" : ajouter la classe via st.markdown wrapper, cf. components.py */
 .stButton.ghost > button {
     background-color: transparent;
     color: var(--secondary);
     border: 1px solid var(--secondary);
 }
-
-/* Bouton destructif / rejet */
 .stButton.danger > button {
     background-color: transparent;
     color: var(--error);
     border: 1px solid var(--error);
 }
 
-/* ---------- Cartes : enveloppées dans un vrai st.container(key="card-N"),
-   cf. components.py -> card(). ---------- */
+/* ---------- Cartes ---------- */
 div[class*="st-key-card-"] {
     background-color: var(--surface-container);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: 16px;
 }
-
 div[class*="st-key-card-"] .card-header {
     font-family: var(--font-mono);
     font-size: 12px;

@@ -158,11 +158,49 @@ section[data-testid="stSidebarNav"] {
 }
 
 /* ---------- Sidebar native masquée : on la restyle plutôt que de la
-   remplacer entièrement, pour rester compatible avec st.sidebar ---------- */
+   remplacer entièrement, pour rester compatible avec st.sidebar.
+   Repli automatique : 72px (icônes seules) par défaut, s'élargit à
+   var(--sidebar-width) au survol OU si épinglée (bouton 📌, cf.
+   sidebar_nav() dans components.py qui ajoute .sidebar-pinned-marker
+   quand st.session_state.sidebar_pinned est vrai). Pur CSS, aucun JS. ---------- */
 section[data-testid="stSidebar"] {
     background-color: var(--surface-container-lowest);
     border-right: 1px solid var(--border-subtle);
+    width: 72px !important;
+    min-width: 72px !important;
+    transition: width 0.2s ease, min-width 0.2s ease;
+    overflow-x: hidden;
+}
+section[data-testid="stSidebar"]:hover,
+section[data-testid="stSidebar"]:has(.sidebar-pinned-marker) {
     width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+}
+
+/* Labels et texte du logo masqués en mode replié, révélés au survol/épinglage */
+.sentinelle-logo-text,
+div[class*="st-key-navitem-"] [data-testid="stPageLink"] p {
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    transition: opacity 0.15s ease, max-width 0.2s ease;
+    display: inline-block;
+}
+section[data-testid="stSidebar"]:hover .sentinelle-logo-text,
+section[data-testid="stSidebar"]:hover div[class*="st-key-navitem-"] [data-testid="stPageLink"] p,
+section[data-testid="stSidebar"]:has(.sidebar-pinned-marker) .sentinelle-logo-text,
+section[data-testid="stSidebar"]:has(.sidebar-pinned-marker) div[class*="st-key-navitem-"] [data-testid="stPageLink"] p {
+    opacity: 1;
+    max-width: 200px;
+}
+
+/* Bouton épingle 📌/📍 : compact, sans fond, toujours visible même replié */
+div[class*="st-key-sentinelle-logo"] .stButton > button {
+    background: transparent;
+    box-shadow: none;
+    padding: 2px 4px;
+    font-size: 14px;
+    min-width: auto;
 }
 
 section[data-testid="stSidebar"] .block-container {
@@ -181,6 +219,19 @@ header[data-testid="stHeader"] {
 
 .stApp > header + div .block-container {
     padding-top: 0 !important;
+}
+
+/* ---------- Zone de contenu principale toujours pleine largeur, qu'elle
+   que soit l'état de la sidebar (ouverte au survol, repliée en icônes,
+   ou totalement masquée via le bouton natif "»"). Sans ça, Streamlit
+   garde une largeur maximale calculée pour une sidebar ouverte et laisse
+   un grand vide à gauche quand elle est repliée/masquée. ---------- */
+.main .block-container,
+div[data-testid="stAppViewBlockContainer"] {
+    max-width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    transition: padding 0.2s ease;
 }
 
 /* Header top bar custom (top_header()), enveloppé dans un vrai
