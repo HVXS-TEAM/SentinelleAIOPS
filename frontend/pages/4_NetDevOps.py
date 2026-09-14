@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/NetDevOps/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="NetDevOps Automation — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -109,7 +112,7 @@ st.html("""
     left: 4px; top: 6px;
     width: 8px; height: 8px;
     border-radius: 50%;
-    border: 2px solid #262b29;
+    border: 2px solid var(--surface-container-high);
 }
 
 /* Findings Items */
@@ -121,7 +124,7 @@ st.html("""
     transition: background 0.15s ease;
 }
 .finding-box.active {
-    background-color: #313633;
+    background-color: var(--surface-container-high);
     border-left: 3px solid var(--error, #ffb4ab);
 }
 .finding-box:not(.active):hover {
@@ -130,7 +133,7 @@ st.html("""
 
 /* Diff View Côte à Côte */
 .diff-container {
-    background-color: #0a0a0a;
+    background-color: var(--surface-container-lowest);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 6px;
     overflow: hidden;
@@ -168,13 +171,13 @@ st.html("""
     min-width: 0;
     padding: 12px;
     background-color: rgba(120, 216, 186, 0.03);
-    color: #94f5d6;
+    color: var(--primary);
     white-space: pre-wrap;
     word-break: break-all;
 }
 .diff-highlight {
     background-color: rgba(120, 216, 186, 0.2);
-    color: #94f5d6;
+    color: var(--primary);
     padding: 1px 4px;
     border-radius: 3px;
 }
@@ -183,7 +186,7 @@ st.html("""
 .btn-reject {
     padding: 8px 18px;
     border-radius: 6px;
-    border: 1px solid #87938e;
+    border: 1px solid var(--outline);
     background: transparent;
     color: var(--on-surface, #dfe4e0);
     font-family: var(--font-body, 'Inter', sans-serif);

@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Assistant_IA/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Assistant IA — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -51,7 +54,7 @@ justify-content: flex-end;
 width: 100%;
 }
 .user-msg-bubble {
-background-color: #323538;
+background-color: var(--surface-container-highest);
 border: 1px solid rgba(255, 255, 255, 0.1);
 border-radius: 16px 16px 2px 16px;
 padding: 14px 20px;
@@ -61,7 +64,7 @@ box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 .user-msg-text {
 font-family: 'Inter', sans-serif;
 font-size: 15px;
-color: #e0e3e6;
+color: var(--on-surface, #e0e3e6);
 line-height: 1.5;
 margin: 0;
 }
@@ -77,7 +80,7 @@ width: 100%;
 width: 38px;
 height: 38px;
 border-radius: 8px;
-background: #1d2022;
+background: var(--surface-container);
 border: 1px solid rgba(120, 216, 186, 0.3);
 display: flex;
 align-items: center;
@@ -88,7 +91,7 @@ box-shadow: 0 0 12px rgba(120, 216, 186, 0.15);
 }
 .ai-response-card {
 flex: 1;
-background-color: #1d2022;
+background-color: var(--surface-container);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 2px 16px 16px 16px;
 padding: 18px 22px;
@@ -97,14 +100,14 @@ box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 .ai-intro-text {
 font-family: 'Inter', sans-serif;
 font-size: 14.5px;
-color: #e0e3e6;
+color: var(--on-surface, #e0e3e6);
 line-height: 1.6;
 margin: 0 0 16px 0;
 }
 
 /* Tableau de saturation disque */
 .ai-table-box {
-background-color: #191c1e;
+background-color: var(--surface-container-lowest);
 border: 1px solid rgba(255, 255, 255, 0.06);
 border-radius: 6px;
 overflow: hidden;
@@ -114,7 +117,7 @@ margin-bottom: 16px;
 display: grid;
 grid-template-columns: 5fr 4fr 3fr;
 gap: 8px;
-background-color: #1d2022;
+background-color: var(--surface-container);
 padding: 8px 14px;
 border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 font-family: 'IBM Plex Sans', monospace;
@@ -191,13 +194,13 @@ margin-bottom: 12px;
 display: inline-flex;
 align-items: center;
 gap: 6px;
-background-color: #1d2022;
+background-color: var(--surface-container-high);
 border: 1px solid rgba(255, 255, 255, 0.1);
 border-radius: 9999px;
 padding: 5px 14px;
 font-family: 'Inter', sans-serif;
 font-size: 12.5px;
-color: #bdc9c3;
+color: var(--on-surface-variant, #bdc9c3);
 cursor: pointer;
 transition: all 0.15s ease;
 }
@@ -210,7 +213,7 @@ background-color: rgba(129, 208, 248, 0.06);
 /* Zone de Saisie Inférieure */
 .chat-input-box {
 position: relative;
-background-color: #191c1e;
+background-color: var(--surface-container-lowest);
 border: 1px solid rgba(255, 255, 255, 0.12);
 border-radius: 12px;
 padding: 14px 16px 46px 16px;
@@ -234,14 +237,14 @@ left: 14px;
 display: inline-flex;
 align-items: center;
 gap: 5px;
-background-color: #323538;
+background-color: var(--surface-container-high);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 4px;
 padding: 2px 8px;
 font-family: 'IBM Plex Sans', monospace;
 font-size: 10px;
 font-weight: 600;
-color: #bdc9c3;
+color: var(--on-surface-variant, #bdc9c3);
 text-transform: uppercase;
 letter-spacing: 0.08em;
 }
@@ -341,7 +344,7 @@ D'après l'analyse prédictive des tendances de consommation, 3 serveurs présen
 </div>
 
 <!-- Ligne 2 : DB-CLUSTER-M1 (Teal) -->
-<div class="ai-table-row" style="background-color: rgba(25, 28, 30, 0.4);">
+<div class="ai-table-row" style="background-color: var(--surface-container-high);">
 <div class="srv-name" style="color: #78d8ba;">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#78d8ba" stroke-width="2" style="display: inline-block;">
 <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>

@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Parc_Informatique/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Parc Informatique — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -41,7 +44,7 @@ position: relative;
 .topo-canvas {
 width: 100%;
 min-height: 290px;
-background-color: #121715;
+background-color: var(--surface-container-lowest);
 background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.06) 1px, transparent 0);
 background-size: 24px 24px;
 position: relative;
@@ -54,7 +57,7 @@ padding: 10px 0;
 .topo-badge {
 position: absolute;
 top: 12px; left: 12px;
-background: rgba(38, 43, 41, 0.85);
+background: var(--surface-container-high);
 backdrop-filter: blur(4px);
 padding: 4px 10px;
 border-radius: 4px;
@@ -69,7 +72,7 @@ z-index: 10;
 .topo-legend {
 position: absolute;
 bottom: 12px; left: 12px;
-background: rgba(38, 43, 41, 0.85);
+background: var(--surface-container-high);
 backdrop-filter: blur(4px);
 padding: 8px 12px;
 border-radius: 6px;
@@ -88,7 +91,7 @@ gap: 4px;
 z-index: 10;
 }
 .topo-btn {
-background: rgba(38, 43, 41, 0.9);
+background: var(--surface-container-high);
 border: 1px solid rgba(255, 255, 255, 0.12);
 color: var(--on-surface, #dfe4e0);
 width: 28px; height: 28px;
@@ -100,7 +103,7 @@ cursor: pointer;
 font-size: 14px;
 }
 .topo-btn:hover {
-background: #313633;
+background: var(--surface-container-highest);
 }
 
 /* Tableau Inventaire */
@@ -215,7 +218,7 @@ Gérez et visualisez l'ensemble de vos actifs réseau.
 </div>
 </div>
 <div style="display: flex; gap: 10px;">
-<button style="background: #1c211e; border: 1px solid rgba(255, 255, 255, 0.15); color: #dfe4e0; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+<button style="background: var(--surface-container); border: 1px solid var(--outline); color: var(--on-surface); padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" xmlns="http://www.w3.org/2000/svg"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
 Filtrer
 </button>
@@ -316,7 +319,7 @@ Inventaire (1,248)
 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#87938e" stroke-width="2" xmlns="http://www.w3.org/2000/svg" style="position: absolute; left: 8px; top: 7px;">
 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
 </svg>
-<input type="text" placeholder="Filtrer par nom, IP, MAC..." style="width: 100%; background: #262b29; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 4px; padding: 3px 8px 3px 26px; font-size: 11px; color: #dfe4e0; outline: none;"/>
+<input type="text" placeholder="Filtrer par nom, IP, MAC..." style="width: 100%; background: var(--surface-container-high); border: 1px solid var(--outline); border-radius: 4px; padding: 3px 8px 3px 26px; font-size: 11px; color: var(--on-surface); outline: none;"/>
 </div>
 </div>
 

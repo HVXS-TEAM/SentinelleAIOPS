@@ -6,7 +6,8 @@ from app.api.v1.endpoints import (
     netdevops,
     inventory,
     admin,
-    assistant
+    assistant,
+    simulation
 )
 
 api_router = APIRouter()
@@ -18,3 +19,4 @@ api_router.include_router(netdevops.router, prefix="/netdevops", tags=["Module N
 api_router.include_router(inventory.router, prefix="/inventory", tags=["Module Parc Informatique"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Reporting & Administration"])
 api_router.include_router(assistant.router, prefix="/assistant", tags=["Assistant IA"])
+api_router.include_router(simulation.router, prefix="/simulation", tags=["Simulation Démo"])

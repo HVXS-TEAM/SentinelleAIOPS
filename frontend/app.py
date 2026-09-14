@@ -37,20 +37,21 @@ from pathlib import Path
 import requests
 import streamlit as st
 
+# ── Chemin absolu du logo ───────────────────────────────────────────────────
+LOGO_PATH = Path(__file__).parent / "static" / "logo.png"
+
 # ── Configuration Streamlit ─────────────────────────────────────────────────
 st.set_page_config(
     page_title="Connexion à Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "🛡️",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# ── Injection du CSS dédié à la page de connexion ──────────────────────────
-LOGIN_CSS_PATH = Path(__file__).parent / "login.css"
-st.markdown(
-    f"<style>{LOGIN_CSS_PATH.read_text(encoding='utf-8')}</style>",
-    unsafe_allow_html=True,
-)
+from components import load_login_theme
+
+# ── Injection automatique du thème de connexion (mode clair/sombre horaire) ──
+load_login_theme()
 
 # ── Initialisation de la session ────────────────────────────────────────────
 if "authenticated" not in st.session_state:

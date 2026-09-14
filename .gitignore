@@ -45,3 +45,5 @@ desktop.ini
 
 # Distribution
 *.whl
+*.zip
+test_output.pdf

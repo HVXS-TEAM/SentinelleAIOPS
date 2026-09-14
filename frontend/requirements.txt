@@ -1,5 +1,6 @@
 # Sentinelle AIOps - Frontend Dependencies
 streamlit
+streamlit-autorefresh
 plotly
 pandas
 numpy

@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Dashboard/screen.png
 Sources : DESIGN.md (tokens) + screen.png (layout, valeurs visuelles)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Dashboard Opérationnel — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )

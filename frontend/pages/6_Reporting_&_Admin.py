@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Admin & Rapport/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Administration & Rapports — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -36,7 +39,7 @@ st.markdown("""<style>
 
 /* Bento Container Cards */
 .admin-card {
-background-color: #191c1e;
+background-color: var(--surface-container);
 border: 1px solid rgba(255, 255, 255, 0.06);
 border-radius: 8px;
 overflow: hidden;
@@ -48,7 +51,7 @@ flex-direction: column;
 .admin-card-header {
 padding: 12px 18px;
 border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-background: rgba(29, 32, 34, 0.85);
+background: var(--surface-container-high);
 display: flex;
 justify-content: space-between;
 align-items: center;
@@ -78,10 +81,10 @@ padding: 10px 16px;
 font-family: 'IBM Plex Sans', monospace;
 font-size: 10px;
 font-weight: 700;
-color: #bdc9c3;
+color: var(--on-surface-variant, #bdc9c3);
 text-transform: uppercase;
 letter-spacing: 0.08em;
-background: rgba(25, 28, 30, 0.5);
+background: var(--surface-container-high);
 border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .users-table td {
@@ -117,8 +120,8 @@ border: 1px solid rgba(129, 208, 248, 0.3);
 .role-badge-visitor {
 padding: 2px 8px;
 border-radius: 2px;
-background: #323538;
-color: #e0e3e6;
+background: var(--surface-container-high);
+color: var(--on-surface, #e0e3e6);
 font-family: 'IBM Plex Sans', monospace;
 font-size: 10px;
 font-weight: 700;
@@ -152,7 +155,7 @@ vertical-align: middle;
 
 /* Item Bibliothèque de Rapports */
 .report-card-item {
-background-color: #1d2022;
+background-color: var(--surface-container-high);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 6px;
 padding: 12px 14px;
@@ -190,7 +193,7 @@ height: 20px;
 .toggle-switch input { opacity: 0; width: 0; height: 0; }
 .toggle-slider {
 position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-background-color: #323538; transition: .2s; border-radius: 20px;
+background-color: var(--surface-container-highest); transition: .2s; border-radius: 20px;
 }
 .toggle-slider:before {
 position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
@@ -378,9 +381,9 @@ with col_left:
 </svg>
 <span>Journal d'Audit</span>
 </div>
-<button style="font-family: 'Inter', sans-serif; font-size: 11px; color: #bdc9c3; padding: 3px 8px; background: #1d2022; border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; cursor: pointer;">Export CSV</button>
+<button style="font-family: 'Inter', sans-serif; font-size: 11px; color: var(--on-surface-variant); padding: 3px 8px; background: var(--surface-container-high); border: 1px solid var(--outline); border-radius: 4px; cursor: pointer;">Export CSV</button>
 </div>
-<div style="overflow-x: auto; padding: 6px; background: rgba(11, 15, 17, 0.5);">
+<div style="overflow-x: auto; padding: 6px; background: var(--surface-container-lowest);">
 <table class="audit-table">
 <thead>
 <tr>
@@ -568,30 +571,30 @@ RÈGLES DE ROUTAGE
 
 <div style="display: flex; flex-direction: column; gap: 6px;">
 <!-- Critical -->
-<div style="background: #1d2022; padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
+<div style="background: var(--surface-container-high); padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
 <div style="display: flex; align-items: center; gap: 6px;">
 <span style="width: 8px; height: 8px; border-radius: 50%; background: #ffb4ab;" class="animate-pulse-urgent"></span>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: #dfe4e0;">Critical</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: var(--on-surface);">Critical</span>
 </div>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: #bdc9c3; background: #191c1e; padding: 2px 6px; border-radius: 3px;">Tous les canaux</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: var(--on-surface-variant); background: var(--surface-container-lowest); padding: 2px 6px; border-radius: 3px;">Tous les canaux</span>
 </div>
 
 <!-- Warning -->
-<div style="background: #1d2022; padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
+<div style="background: var(--surface-container-high); padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
 <div style="display: flex; align-items: center; gap: 6px;">
 <span style="width: 8px; height: 8px; border-radius: 50%; background: #81d0f8;"></span>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: #dfe4e0;">Warning</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: var(--on-surface);">Warning</span>
 </div>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: #bdc9c3; background: #191c1e; padding: 2px 6px; border-radius: 3px;">Email &amp; Telegram</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: var(--on-surface-variant); background: var(--surface-container-lowest); padding: 2px 6px; border-radius: 3px;">Email &amp; Telegram</span>
 </div>
 
 <!-- Info -->
-<div style="background: #1d2022; padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
+<div style="background: var(--surface-container-high); padding: 8px 12px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: space-between;">
 <div style="display: flex; align-items: center; gap: 6px;">
 <span style="width: 8px; height: 8px; border-radius: 50%; background: #3e4945;"></span>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: #dfe4e0;">Info</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 11.5px; font-weight: 600; color: var(--on-surface);">Info</span>
 </div>
-<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: #bdc9c3; background: #191c1e; padding: 2px 6px; border-radius: 3px;">Email Uniquement</span>
+<span style="font-family: 'IBM Plex Sans', monospace; font-size: 10px; color: var(--on-surface-variant); background: var(--surface-container-lowest); padding: 2px 6px; border-radius: 3px;">Email Uniquement</span>
 </div>
 </div>
 </div>

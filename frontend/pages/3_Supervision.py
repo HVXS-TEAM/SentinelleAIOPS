@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Supervision/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Supervision & Analyses Prédictives — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -153,7 +156,7 @@ st.html("""
     transition: background-color 0.15s ease;
 }
 .urgency-item:hover {
-    background-color: #313633;
+    background-color: var(--surface-container-highest);
 }
 </style>
 """)
@@ -248,9 +251,9 @@ with col_main:
                             <span style="color: var(--on-surface-variant, #bdc9c3);">Seuil d'Avertissement</span>
                             <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d37768; background: rgba(211, 119, 104, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(211, 119, 104, 0.3);">80%</span>
                         </div>
-                        <div style="position: relative; width: 100%; height: 4px; background: #353a38; border-radius: 2px;">
+                        <div style="position: relative; width: 100%; height: 4px; background: var(--surface-container-highest); border-radius: 2px;">
                             <div style="position: absolute; left: 0; top: 0; height: 100%; width: 80%; background: #d37768; border-radius: 2px;"></div>
-                            <div style="position: absolute; top: 50%; left: 80%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #d37768; border: 2px solid #0f1412; cursor: pointer;"></div>
+                            <div style="position: absolute; top: 50%; left: 80%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #d37768; border: 2px solid var(--surface-container); cursor: pointer;"></div>
                         </div>
                     </div>
 
@@ -259,9 +262,9 @@ with col_main:
                             <span style="color: var(--on-surface-variant, #bdc9c3);">Seuil Critique</span>
                             <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #ffb4ab; background: rgba(255, 180, 171, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 180, 171, 0.3);">95%</span>
                         </div>
-                        <div style="position: relative; width: 100%; height: 4px; background: #353a38; border-radius: 2px;">
+                        <div style="position: relative; width: 100%; height: 4px; background: var(--surface-container-highest); border-radius: 2px;">
                             <div style="position: absolute; left: 0; top: 0; height: 100%; width: 95%; background: #ffb4ab; border-radius: 2px;"></div>
-                            <div style="position: absolute; top: 50%; left: 95%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffb4ab; border: 2px solid #0f1412; cursor: pointer;"></div>
+                            <div style="position: absolute; top: 50%; left: 95%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffb4ab; border: 2px solid var(--surface-container); cursor: pointer;"></div>
                         </div>
                     </div>
                 </div>
@@ -294,7 +297,7 @@ with col_main:
                         <span style="width: 14px; height: 0px; border-top: 2px dashed #d37768;"></span>
                         Zone de prédiction (+48h)
                     </div>
-                    <select style="background: #262b29; border: 1px solid #3e4945; color: #dfe4e0; font-size: 12px; border-radius: 4px; padding: 4px 8px; outline: none;">
+                    <select style="background: var(--surface-container-high); border: 1px solid var(--outline); color: var(--on-surface); font-size: 12px; border-radius: 4px; padding: 4px 8px; outline: none;">
                         <option>FW-EXT-02</option>
                         <option>Cluster Core (All)</option>
                     </select>

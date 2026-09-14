@@ -4,11 +4,14 @@ Pixel-perfect ref : Ecrans_Reference/Securite/code.html + screen.png
 Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
 """
 import os, sys
+from pathlib import Path
 import streamlit as st
+
+_LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
 
 st.set_page_config(
     page_title="Sécurité Overview — Sentinelle AIOps",
-    page_icon="🛡️",
+    page_icon=_LOGO_PATH,
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -90,7 +93,7 @@ st.html("""
     z-index: 10;
     padding: 14px 18px;
     border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-    background: rgba(29, 32, 34, 0.85);
+    background: var(--surface-container);
     backdrop-filter: blur(4px);
     display: flex;
     justify-content: space-between;
@@ -158,13 +161,13 @@ st.html("""
     position: relative;
     z-index: 10;
     padding: 16px 20px;
-    background: linear-gradient(180deg, transparent 0%, rgba(29, 32, 34, 0.95) 40%, rgba(29, 32, 34, 1) 100%);
+    background: linear-gradient(180deg, transparent 0%, var(--surface-container) 40%, var(--surface-container) 100%);
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 16px;
 }
 .hud-tile {
-    background: rgba(39, 42, 45, 0.8);
+    background: var(--surface-container-high);
     backdrop-filter: blur(4px);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 8px;
@@ -216,7 +219,7 @@ st.html("""
 .incidents-header {
     padding: 14px 20px;
     border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-    background: rgba(25, 28, 30, 0.9);
+    background: var(--surface-container-low);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -235,7 +238,7 @@ st.html("""
     color: var(--on-surface-variant, #bdc9c3);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    background: rgba(39, 42, 45, 0.4);
+    background: var(--surface-container-high);
     border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
     text-align: left;
 }
