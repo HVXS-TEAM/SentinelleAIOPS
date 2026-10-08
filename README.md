@@ -1,7 +1,7 @@
 # 🛡️ Sentinelle AIOps — Plateforme Centralisée d'Administration Système & Réseau
 
 **Diplôme préparé :** BTS SIO (option SISR) / CIEL / CPR — Épreuve E6 (Projet Technique)  
-**Technologies :** Python 3.11+, FastAPI, Streamlit, PostgreSQL, scikit-learn, Netmiko, Ollama (LLM local), Docker Compose.
+**Technologies :** Python 3.11+ (testé 3.14), FastAPI, Streamlit 1.65, SQLite, scikit-learn (Isolation Forest), Netmiko, Ollama (LLM local).
 
 ---
 
@@ -89,16 +89,28 @@ docker-compose up -d
 
 ## 📄 Scripts de vérification (recette)
 
-```bash
-# backend (le backend doit tourner sur le port 8000)
-cd backend
-../venv_env/Scripts/python.exe verif_etape1.py   # TTF, alertes, santé
-../venv_env/Scripts/python.exe verif_etape4.py   # Rapport PDF
+Le backend doit tourner (port 8000) et, pour les tests front, le compte de démo est utilisé automatiquement.
 
-# frontend (backend requis)
-cd frontend
-../venv_env/Scripts/python.exe verif_etape5_supervision.py
+```bash
+# ── Backend (depuis backend/, backend en marche) ──
+../venv_env/Scripts/python.exe verif_etape1.py   # TTF, alertes, score de santé
+../venv_env/Scripts/python.exe verif_etape2.py   # maintenance / rétention des données
+../venv_env/Scripts/python.exe verif_etape3.py   # module sécurité (Isolation Forest)
+../venv_env/Scripts/python.exe verif_etape4.py   # génération du rapport PDF
+
+# ── Frontend (depuis frontend/, backend en marche) ──
+../venv_env/Scripts/python.exe verif_etape3_front.py      # MFA, rôles, session, hors-ligne
+../venv_env/Scripts/python.exe verif_etape5_supervision.py # carte prédiction + TTF
+../venv_env/Scripts/python.exe verif_hors_ligne_pages.py   # robustesse des 7 pages, API coupée
 ```
+
+Recette de bout en bout rejouable (6 actes de démo + validation du PDF) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File recette_6actes.ps1
+```
+
+> Dernier passage de recette : tous les scripts au vert (voir §7 de `Progress_Sentinelle.md`).
 
 ---
 
