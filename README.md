@@ -19,52 +19,85 @@
 
 ---
 
-## 🛠️ Installation & Démarrage Rapide
+## 🛠️ Installation & Démarrage Rapide (mode natif)
 
-### 1. Cloner / Ouvrir le Répertoire du Projet
-```bash
-cd "e:/Projets Edwin/BTS Projects/Sentinelle AIOPS"
-```
+> **Prérequis :** Python 3.11+ (testé avec 3.14), aucun Docker nécessaire.
+> Le venv `venv_env/` et les dépendances sont créés automatiquement au premier lancement.
 
-### 2. Installer les Dépendances Python
+### Démarrage en une commande
+
+| Action | Double-clic (Explorateur) | Ligne de commande |
+| :--- | :--- | :--- |
+| **Backend + Frontend** | `demarrer_tout.bat` | `powershell -ExecutionPolicy Bypass -File scripts\start_all.ps1` |
+| Backend seul (port 8000) | `demarrer_backend.bat` | `powershell -ExecutionPolicy Bypass -File scripts\start_backend.ps1` |
+| Frontend seul (port 8501) | `demarrer_frontend.bat` | `powershell -ExecutionPolicy Bypass -File scripts\start_frontend.ps1` |
+| Préflight environnement | — | `powershell -ExecutionPolicy Bypass -File scripts\check_env.ps1` |
+
+- Documentation API interactive : **http://localhost:8000/docs**
+- Interface web : **http://localhost:8501**
+- Le scheduler démarre avec le backend (télémétrie 10 s, TTF 30 s, santé du parc 60 s).
+
+### Commandes manuelles (équivalent)
+
 ```bash
+# dépendances (si le venv n'existe pas encore)
 py -m pip install --pre -r requirements.txt
+
+# backend (depuis le dossier backend/)
+cd backend
+../venv_env/Scripts/python.exe -m uvicorn main:app --port 8000
+
+# frontend
+venv_env/Scripts/python.exe -m streamlit run frontend/app.py
 ```
 
-### 3. Initialiser la Base de Données (SQLite / PostgreSQL)
-```bash
-py scripts/init_db.py
-```
+### ⚠️ Base de données
 
-### 4. Lancer le Backend API REST (FastAPI)
-```bash
-py -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-> La documentation interactive OpenAPI est disponible sur `http://localhost:8000/docs`
-
-### 5. Lancer l'Interface Frontend (Streamlit)
-```bash
-py -m streamlit run frontend/app.py
-```
-> L'interface web s'ouvre sur `http://localhost:8501`
+- **Base réelle :** `backend/sentinelle_aiops.db` (SQLite, créée/autocomplétée au démarrage du backend).
+- `py scripts/init_db.py` **écrase et recrée toute la base** (données de démo incluses) :
+  à n'utiliser que pour une réinitialisation complète.
+- Les `.env` : `backend/.env` porte la `SECRET_KEY` (générée, à conserver).
 
 ---
 
-## 🐳 Déploiement Conteneurisé avec Docker Compose
-
-Pour déployer l'intégralité du lab (Base PostgreSQL, Backend FastAPI et Frontend Streamlit) :
-
-```bash
-docker-compose up -d
-```
-
----
 
 ## 🧪 Lancer la Suite de Tests Unitaires
 
 ```bash
 cd backend
-py -m pytest tests
+../venv_env/Scripts/python.exe -m pytest tests
+```
+
+> 39 tests sont attendus (`39 passed`).
+
+---
+
+## 🐳 Option secondaire : Déploiement Conteneurisé (non maintenu)
+
+Une configuration Docker Compose (PostgreSQL + Backend + Frontend) existe dans
+`docker-compose.yml` mais **n'est plus validée** : le mode natif (§ Installation) est
+le mode officiel. En cas de besoin :
+
+```bash
+docker-compose up -d
+```
+
+> ⚠️ Le `DATABASE_URL` de `docker-compose.yml` pointe vers un hôte PostgreSQL à vérifier
+> avant usage, et la base de données réelle du projet est SQLite (`backend/sentinelle_aiops.db`).
+
+---
+
+## 📄 Scripts de vérification (recette)
+
+```bash
+# backend (le backend doit tourner sur le port 8000)
+cd backend
+../venv_env/Scripts/python.exe verif_etape1.py   # TTF, alertes, santé
+../venv_env/Scripts/python.exe verif_etape4.py   # Rapport PDF
+
+# frontend (backend requis)
+cd frontend
+../venv_env/Scripts/python.exe verif_etape5_supervision.py
 ```
 
 ---

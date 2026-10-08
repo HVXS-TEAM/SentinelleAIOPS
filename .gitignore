@@ -58,4 +58,6 @@ verif*_err.txt
 pytest_out.txt
 pytest_err.txt
 backend_uvicorn_*.txt
+*_out.txt
+*_err.txt
 

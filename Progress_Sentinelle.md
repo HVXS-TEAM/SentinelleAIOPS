@@ -51,42 +51,52 @@ installer Streamlit). À réévaluer après la modernisation de D1.
 
 ## 3. Feuille de route
 
-### Étape 0 — Rangements & gel de l'avancement
+### Étape 0 — Rangements & gel de l'avancement ✅ TERMINÉE (08/10/2026)
 > Objectif : partir d'un dépôt propre et traçable.
 
-- [ ] Commit complet de l'état validé (étapes 1→5), ex. :
-      `feat: etapes 1-5 — maintenance, auth MFA, rapports PDF, supervision dynamisee` *(Statut : ⏳ / Date : )*
-- [ ] Backup de `backend/sentinelle_aiops.db` **avant** toute suppression (copie hors git).
-- [ ] Ajouter au `.gitignore` : `_patch_etape*/`, `_backup_etape*/`, `*.bak_*`, `*.zip` d'étapes,
-      `verif*_out.txt` (vérifier l'existant avant).
-- [ ] Supprimer du disque : `_patch_etape1..5/`, `_backup_etape3..5/`, `*.bak_etape1..3`,
-      `*.db.bak_*`, `etape*_patch.zip`, `files.zip`, doublons PDF (`test_output.pdf`, doublons `docs/`).
-- [ ] Vérifier `git status` propre après nettoyage.
+- [x] Commit complet de l'état validé (étapes 1→5) : `3369df9`
+      `feat: etapes 1-5 — maintenance, auth MFA, rapports PDF, supervision dynamisee` (45 fichiers)
+- [x] Backup de `backend/sentinelle_aiops.db` → `backup/sentinelle_aiops_20261008_1715.db`
+      (dossier `backup/` ajouté au `.gitignore`).
+- [x] `.gitignore` enrichi : `_patch_etape*/`, `_backup_etape*/`, `*.bak_*`, `backup/`,
+      `verif*_out.txt`, `verif*_err.txt`, `pytest_out.txt`, `pytest_err.txt`, `backend_uvicorn_*.txt`.
+- [x] Supprimé du disque : `_patch_etape1..5/`, `_backup_etape3..5/`, `*.bak_etape1..3`,
+      `*.db.bak_*`, `etape*_patch.zip`, `files.zip`, `test_output.pdf`.
+- [x] `git rm` des doublons suivis : `Resume_sentinelle.pdf`, `Résumé_Sentinelle.pdf`
+      (copies identiques de `docs/`), `frontend/files.zip` — commit `7269b8f`.
+- [x] `git status` propre ; **`pytest -q` → 39 passed** après nettoyage.
 
-**Validation :** `git status` sans artefact ; `pytest -q` toujours à 39 passed.
+**Validation :** ✅ `git status` sans artefact ; ✅ `pytest -q` = 39 passed.
 
-### Étape 1 — Backend fonctionnel nativement (D2)
+### Étape 1 — Backend fonctionnel nativement (D2) ✅ TERMINÉE (08/10/2026)
 > Objectif : « un clone + un script = le backend tourne ».
 
-- [ ] Créer `scripts/start_backend.bat` et `scripts/start_backend.ps1` :
-      création/vérification du venv, `pip install -r backend/requirements.txt`,
-      lancement `uvicorn main:app` (port 8000) depuis `backend/`.
-- [ ] Créer `scripts/start_frontend.bat` / `.ps1` : `streamlit run frontend/app.py` (port 8501).
-- [ ] Créer `scripts/start_all.ps1` : backend + frontend, URLs affichées.
-- [ ] Créer `scripts/check_env.ps1` : vérifie version Python (>=3.11), venv présent,
-      ports 8000/8501 libres.
-- [ ] Corriger/valider les commandes du README (§ Installation) contre la réalité :
-      `uvicorn backend.main:app` depuis la racine — **à tester** ; sinon documenter le lancement
-      depuis `backend/`.
-- [ ] Statuer sur `scripts/init_db.py` : il fait `drop_all` (détruit la base !) — le documenter
-      comme « réinitialisation complète » et éventuellement proposer une variante non destructive.
-- [ ] Tenir à jour `backend/.env` : conserver `SECRET_KEY` générée, documenter les variables
-      (`CORS_ORIGINS`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
-- [ ] Docker : reléguer en section secondaire du README (« Optionnel / Non maintenu »),
-      le laisser tel quel ou supprimer `docker-compose.yml` *(décision mineure à trancher au moment T)*.
+- [x] `scripts/start_backend.ps1` + `scripts/start_frontend.ps1` : création auto du venv
+      si absent, installation des dépendances au 1er lancement, vérification du port,
+      lancement uvicorn/streamlit. **Testés** : backend UP (200), frontend UP (200).
+- [x] `scripts/start_all.ps1` : préflight → backend (fenêtre dédiée) → attente /docs →
+      frontend (fenêtre dédiée) → bandeau URLs. **Testé de bout en bout** : 8000 UP + 8501 UP.
+- [x] `scripts/check_env.ps1` : Python ≥ 3.11, venv, dépendances critiques, base SQLite,
+      ports libres. **Testé en positif** (ENVIRONNEMENT PRÊT, exit 0) **et en négatif**
+      (blocage de start_all quand une dépendance critique manque, exit 1).
+      `scikit-learn` traité en **avertissement non bloquant** (repli statistique dans
+      `security_service` : `HAS_SKLEARN` + scoring de repli).
+- [x] Wrappers double-clic : `demarrer_backend.bat`, `demarrer_frontend.bat`, `demarrer_tout.bat`
+      (commentaires ASCII, `%~dp0` quoté pour supporter les chemins à espaces).
+- [x] README : section « mode natif » réécrite (tableau de démarrage, commandes manuelles,
+      avertissement `init_db.py` destructif, `SECRET_KEY`), Docker relégué en option
+      secondaire non maintenu, section scripts de vérification ajoutée.
+- [x] Corrections de robustesse : BOM UTF-8 sur les `.ps1` (lecture PowerShell 5.1),
+      quotation des chemins à espaces dans `Start-Process -ArgumentList`,
+      `$ErrorActionPreference="Continue"` dans `check_env.ps1` (tracebacks non bloquants).
 
-**Validation :** depuis un clone vierge, `start_all.ps1` suffit à servir `http://localhost:8000/docs`
-et `http://localhost:8501` ; `pytest -q` OK.
+**Point ouvert :** `scikit-learn` n'est **pas encore installé** dans le venv (Python 3.14
+nécessite le wheel `cp314`, téléchargement échoué à cause du réseau PyPI instable pendant
+les tests). L'app fonctionne en mode repli (scores de démo identiques : `-0.85`), mais
+`pip install scikit-learn` est **à refaire avant une soutenance** pour activer l'Isolation
+Forest réel. `check_env.ps1` le signale à chaque préflight.
+
+**Validation :** ✅ `check_env` exit 0 ; ✅ `start_all` → 8000 UP + 8501 UP ; ✅ arrêt propre.
 
 ---
 
@@ -180,4 +190,6 @@ en l'état).
 | Date | Événement |
 | :--- | :--- |
 | 08/10/2026 | Création du document. Décisions D1 (Streamlit modernisé), D2 (natif sans Docker), D3 (commit + nettoyage) arrêtées. Validation des étapes 1→5 confirmée (39 tests OK, verif_etape5 TOUT EST OK). |
+| 08/10/2026 | **Étape 0 terminée** : commits `3369df9` (état validé, 45 fichiers) + `7269b8f` (suppression artefacts), backup base `backup/sentinelle_aiops_20261008_1715.db`, `.gitignore` enrichi, pytest 39 passed après nettoyage. |
+| 08/10/2026 | **Étape 1 terminée** : scripts natifs `check_env/start_backend/start_frontend/start_all` (.ps1) + 3 wrappers `.bat`, README réécrit (mode natif, Docker secondaire), tests positif/négatif OK, `start_all` validé de bout en bout (8000+8501 UP). Point ouvert : installation `scikit-learn` à refaire (réseau PyPI instable). |
 
