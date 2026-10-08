@@ -101,7 +101,7 @@ Pour une ergonomie optimale lors de la présentation orale :
 ---
 
 ### 3.4. Mécanisme de Rafraîchissement & Gestion du Cache
-- **Auto-Refresh discret :** Utilisation de l'intervalle `st_autorefresh(interval=5000, key="datarefresh")` (toutes les 5 secondes) avec bouton pause pour figer l'écran pendant les explications au jury.
+- **Auto-Refresh discret :** Fragment natif `@st.fragment(run_every=5)` appelant `st.rerun()` (toutes les 5 secondes), avec bouton pause pour figer l'écran pendant les explications au jury. (Ancien `st_autorefresh` retiré : dépendance abandonnée — voir `Progress_Sentinelle.md` § décision D1.)
 - **Gestion des erreurs & Mode Hors-ligne :** En cas d'indisponibilité momentanée de l'API, le front-end capture l'exception proprement et affiche un avertissement clair au lieu de lever un écran de crash rouge.
 
 ---
@@ -113,5 +113,26 @@ Pour une ergonomie optimale lors de la présentation orale :
 | **Socle Back-end** | FastAPI, BDD SQLAlchemy, JWT + MFA TOTP, 6 Services métiers | ✅ **TERMINÉ** |
 | **Phase 1 : Moteur Autonome** | `scheduler.py` (télémétrie 10s, TTF 30s, santé 60s) + `lifespan` | ✅ **TERMINÉ** |
 | **Phase 2 : Simulation Démo** | `simulation.py` (4 endpoints) + `router.py` + tests unitaires (PASS) | ✅ **TERMINÉ** |
-| **Phase 3 : Dynamisation Front-end** | Raccordement Streamlit (7 pages) + Panneau Démo 1-Clic + Auto-refresh | ⏳ **EN COURS D'ENGAGEMENT** |
+| **Phase 3 : Dynamisation Front-end** | Raccordement Streamlit (7 pages) + Panneau Démo 1-Clic + Auto-refresh natif | ✅ **TERMINÉ** |
 | **Phase 4 : Hardening & Tests** | Couverture de tests accrue + répétition générale soutenance | 📅 **À VENIR** |
+
+---
+
+## 5. Note de statut final — remise en état & recette (08/10/2026)
+
+Le projet a fait l'objet d'une remise en état complète (cf. `Progress_Sentinelle.md`) :
+lancement **natif** (scripts `scripts/*.ps1` + `demarrer_*.bat`, sans Docker), **Streamlit
+modernisé en 1.65.0** (dépendance abandonnée `streamlit-autorefresh` retirée, remplacée par
+un fragment natif ; `use_container_width` et `datetime.utcnow()` dépréciés remplacés).
+
+Recette globale validée le 08/10/2026 (aucun échec) :
+
+| Contrôle | Script | Résultat |
+| :--- | :--- | :---: |
+| Tests unitaires back-end | `pytest -q` | ✅ 39 passed |
+| Auth / MFA / rôles / hors-ligne | `frontend/verif_etape3_front.py` | ✅ 16/16 |
+| Supervision prédictive (TTF) | `frontend/verif_etape5_supervision.py` | ✅ 13/13 |
+| Hors-ligne sur les 7 pages | `frontend/verif_hors_ligne_pages.py` | ✅ 14/14 |
+| 6 actes de démo (dont PDF) | `recette_6actes.ps1` | ✅ 6/6 |
+
+Base de données sauvegardée dans `backup/`. Préflight `scripts/check_env.ps1` → exit 0.

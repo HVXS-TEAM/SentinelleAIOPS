@@ -144,15 +144,21 @@ Streamlit 1.65.0) ; ✅ `pytest -q` → 39 passed ; ✅ `check_env` exit 0 avec 
 ### Étape 3 — Recette globale & soutenance
 > Objectif : preuve de bout en bout.
 
-- [ ] `pytest -q` → 39 passed minimum (régression nulle).
-- [ ] Parcours manuel des 6 actes de démo via le panneau 1-clic :
+- [x] `pytest -q` → 39 passed minimum (régression nulle).
+- [x] Parcours manuel des 6 actes de démo via le panneau 1-clic :
       bruteforce → score santé chute ; stress disque → courbe 88% + TTF ; faille CIS →
       3 non-conformités ; reset → nominal. (`verif_etape4.py` pour le PDF.)
-- [ ] Vérifier le mode hors-ligne (API coupée) sur toutes les pages : bandeau, pas d'écran rouge.
-- [ ] Vérifier MFA TOTP (login admin) + rôles (visiteur/technicien/administrateur).
-- [ ] Mettre à jour `ETAT_SITUATION_BACKEND.md` : statuts finaux.
+      → Script rejouable `recette_6actes.ps1` : **6/6 OK** (PDF validé 68 Ko, magic `%PDF`).
+- [x] Vérifier le mode hors-ligne (API coupée) sur toutes les pages : bandeau, pas d'écran rouge.
+      → Nouveau `frontend/verif_hors_ligne_pages.py` : **14/14 OK** (7 pages, aucune exception,
+      bandeau d'avertissement partout). Seuls les `ScriptRunContext` bénins ignorés.
+- [x] Vérifier MFA TOTP (login admin) + rôles (visiteur/technicien/administrateur).
+      → `frontend/verif_etape3_front.py` : **TOUT EST OK (16/16)** (MFA, rôles, hors-ligne, session expirée).
+- [x] Mettre à jour `ETAT_SITUATION_BACKEND.md` : statuts finaux.
 
-**Validation :** checklist complète cochée ; rien d'échoue.
+**Validation :** ✅ checklist complète cochée ; rien n'a échoué.
+pytest 39 passed · verif_etape3 16/16 · verif_etape5 13/13 · hors-ligne 7 pages 14/14 ·
+6 actes démo 6/6. Base sauvegardée dans `backup/`.
 
 ### Étape 4 — Documentation
 - [ ] README : instructions natives (scripts), section Docker secondaire, versions réelles
@@ -208,4 +214,5 @@ en l'état).
 | 08/10/2026 | **Étape 0 terminée** : commits `3369df9` (état validé, 45 fichiers) + `7269b8f` (suppression artefacts), backup base `backup/sentinelle_aiops_20261008_1715.db`, `.gitignore` enrichi, pytest 39 passed après nettoyage. |
 | 08/10/2026 | **Étape 1 terminée** : scripts natifs `check_env/start_backend/start_frontend/start_all` (.ps1) + 3 wrappers `.bat`, README réécrit (mode natif, Docker secondaire), tests positif/négatif OK, `start_all` validé de bout en bout (8000+8501 UP). Point ouvert : installation `scikit-learn` à refaire (réseau PyPI instable). |
 | 08/10/2026 | **Étape 2 terminée** : Streamlit 1.65.0 (wheel offline), `streamlit-autorefresh` supprimé → fragment natif `@st.fragment(run_every=5)` avec garde anti-boucle + pause soutenance + désarmement AppTest, `utcnow()` → helper `utcnow_naive()` (17 sites back + 3 front), `use_container_width` → `width`. Validations : verif_etape5 TOUT EST OK (13/13), pytest 39 passed, check_env exit 0. Commit `5277f3d` (26 fichiers). Reste reporté : dépendances mineures + `scikit-learn` (réseau PyPI instable). |
+| 08/10/2026 | **Étape 3 terminée** : recette globale validée sans échec — pytest 39 passed, verif_etape3 (MFA/rôles/hors-ligne/session) 16/16, verif_etape5 (TTF) 13/13, **nouveau** `verif_hors_ligne_pages.py` 14/14 (7 pages), 6 actes démo 6/6 (PDF validé `%PDF`, 68 Ko). Base sauvegardée `backup/sentinelle_aiops_20261008_2225.db`. Suivi `Progress_Sentinelle.md` + `ETAT_SITUATION_BACKEND.md` mis à jour (Phase 3 → TERMINÉ, §5 note de recette). Reste : étape 4 (doc finale). |
 
