@@ -12,6 +12,7 @@ import io
 import os
 import requests
 from datetime import datetime, timedelta
+from app.core.time_utils import utcnow_naive
 from typing import Dict, List, Optional, Tuple
 from xml.sax.saxutils import escape
 
@@ -156,7 +157,7 @@ class ReportingService:
                 "Le module ReportLab n'est pas installé sur le serveur (pip install reportlab)."
             ) from exc
 
-        now = now or datetime.utcnow()
+        now = now or utcnow_naive()
         d = self._collect(db, now)
         hx = colors.HexColor
         W = A4[0] - 36 * mm  # largeur utile

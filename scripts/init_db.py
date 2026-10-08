@@ -1,6 +1,6 @@
 import sys
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Add backend directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'backend')))
@@ -34,21 +34,21 @@ def init_db():
             role="Administrateur",
             mfa_active=True,
             mfa_secret=generate_totp_secret(),
-            date_creation=datetime.utcnow()
+            date_creation=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         tech_user = Utilisateur(
             identifiant="tech",
             hash_mot_de_passe=hash_password("TechPass2026!"),
             role="Technicien",
             mfa_active=False,
-            date_creation=datetime.utcnow()
+            date_creation=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         visitor_user = Utilisateur(
             identifiant="visiteur",
             hash_mot_de_passe=hash_password("VisitorPass2026!"),
             role="Visiteur",
             mfa_active=False,
-            date_creation=datetime.utcnow()
+            date_creation=datetime.now(timezone.utc).replace(tzinfo=None)
         )
         db.add_all([admin_user, tech_user, visitor_user])
         db.commit()
@@ -98,7 +98,7 @@ def init_db():
         db.commit()
 
         print("Seeding historical metrics...")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         metrics = []
         # Generate 24h metrics for SRV-AUTH-01 (Disk filling scenario)
         for h in range(24):

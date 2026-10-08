@@ -1,4 +1,5 @@
-from datetime import datetime
+from app.core.time_utils import utcnow_naive
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -16,7 +17,7 @@ class Equipement(Base):
     firmware = Column(String(50), nullable=True)
     uptime = Column(String(50), nullable=True)
     health_score = Column(Float, default=100.0)  # Score de santé 0-100
-    date_decouverte = Column(DateTime, default=datetime.utcnow)
+    date_decouverte = Column(DateTime, default=utcnow_naive)
 
     # Relationships
     metriques = relationship("Metrique", back_populates="equipement", cascade="all, delete-orphan")
@@ -32,7 +33,7 @@ class Metrique(Base):
     equipement_id = Column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
     type_metrique = Column(String(50), nullable=False)  # cpu_percent, ram_percent, disk_percent, bandwidth_mbps
     valeur = Column(Float, nullable=False)
-    horodatage = Column(DateTime, default=datetime.utcnow, index=True)
+    horodatage = Column(DateTime, default=utcnow_naive, index=True)
 
     equipement = relationship("Equipement", back_populates="metriques")
 
@@ -44,7 +45,7 @@ class Prediction(Base):
     equipement_id = Column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
     metrique = Column(String(50), nullable=False)
     ttf_estime = Column(Float, nullable=False)  # Time-To-Failure estimé en heures
-    date_calcul = Column(DateTime, default=datetime.utcnow)
+    date_calcul = Column(DateTime, default=utcnow_naive)
 
     equipement = relationship("Equipement", back_populates="predictions")
 
@@ -59,7 +60,7 @@ class EvenementSecurite(Base):
     type_evenement = Column(String(100), nullable=False)  # SSH_BRUTEFORCE, PORT_SCAN, AUTH_FAILURE
     score_anomalie = Column(Float, nullable=False)  # Output d'IsolationForest
     severite = Column(String(20), nullable=False)  # info, warning, critique
-    horodatage = Column(DateTime, default=datetime.utcnow, index=True)
+    horodatage = Column(DateTime, default=utcnow_naive, index=True)
 
 
 class AuditReseau(Base):
@@ -72,7 +73,7 @@ class AuditReseau(Base):
     criticite = Column(String(20), nullable=False)  # faible, moyenne, elevee
     correctif_propose = Column(Text, nullable=True)  # Commandes Cisco IOS proposées par Ollama
     statut = Column(String(30), default="non_corrige")  # non_corrige, valide, applique
-    date_audit = Column(DateTime, default=datetime.utcnow)
+    date_audit = Column(DateTime, default=utcnow_naive)
 
     equipement = relationship("Equipement", back_populates="audits")
 
@@ -84,7 +85,7 @@ class SauvegardeConfig(Base):
     equipement_id = Column(Integer, ForeignKey("equipements.id"), nullable=False, index=True)
     contenu = Column(Text, nullable=False)
     hash_integrite = Column(String(64), nullable=False)  # SHA-256
-    date_sauvegarde = Column(DateTime, default=datetime.utcnow)
+    date_sauvegarde = Column(DateTime, default=utcnow_naive)
 
     equipement = relationship("Equipement", back_populates="sauvegardes")
 
@@ -98,7 +99,7 @@ class Alerte(Base):
     severite = Column(String(20), nullable=False)  # info, warning, critique
     message = Column(Text, nullable=False)
     statut = Column(String(20), default="active")  # active, acquitte, resolue
-    date_creation = Column(DateTime, default=datetime.utcnow, index=True)
+    date_creation = Column(DateTime, default=utcnow_naive, index=True)
 
 
 class Utilisateur(Base):
@@ -110,7 +111,7 @@ class Utilisateur(Base):
     role = Column(String(30), nullable=False, default="Technicien")  # Administrateur, Technicien, Visiteur
     mfa_active = Column(Boolean, default=False)
     mfa_secret = Column(String(32), nullable=True)
-    date_creation = Column(DateTime, default=datetime.utcnow)
+    date_creation = Column(DateTime, default=utcnow_naive)
 
     journal_actions = relationship("JournalAudit", back_populates="utilisateur", cascade="all, delete-orphan")
 
@@ -123,6 +124,6 @@ class JournalAudit(Base):
     action = Column(String(255), nullable=False)
     cible = Column(String(255), nullable=True)
     adresse_ip = Column(String(45), nullable=True)
-    horodatage = Column(DateTime, default=datetime.utcnow, index=True)
+    horodatage = Column(DateTime, default=utcnow_naive, index=True)
 
     utilisateur = relationship("Utilisateur", back_populates="journal_actions")

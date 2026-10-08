@@ -1,5 +1,5 @@
 """Tests de l'étape 1 : TTF sur points récents, alertes dédupliquées, score de santé unique."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -27,7 +27,7 @@ def db():
 
 
 def _add_series(db, eq_id, metrique, values, step_s=10, end=None):
-    end = end or datetime.utcnow()
+    end = end or datetime.now(timezone.utc).replace(tzinfo=None)
     n = len(values)
     for i, v in enumerate(values):
         db.add(Metrique(equipement_id=eq_id, type_metrique=metrique, valeur=v,
@@ -52,7 +52,7 @@ def test_estimate_ttf_ignores_flat_noisy_and_decreasing():
 
 def test_calculate_ttf_uses_most_recent_points(db):
     # Ancien historique en forte hausse (ne doit PAS compter) puis plateau récent stable
-    old_end = datetime.utcnow() - timedelta(days=2)
+    old_end = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=2)
     _add_series(db, 1, "disk_percent", [10 + i for i in range(60)], end=old_end)
     _add_series(db, 1, "disk_percent", [50.0] * 200)
     assert supervision_service.calculate_ttf(db, 1, "disk_percent") is None
@@ -73,7 +73,7 @@ def test_legacy_duplicates_are_resolved(db):
     for i in range(4):
         db.add(Alerte(type="RessourceCritique", module_origine="supervision", severite="critique",
                       message=f"Alerte préventive : TTF estimé à 0.{i}h pour disk_percent sur SRV-TEST-01",
-                      statut="active", date_creation=datetime.utcnow() - timedelta(hours=i + 1)))
+                      statut="active", date_creation=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=i + 1)))
     db.commit()
     supervision_service.calculate_ttf(db, 1, "disk_percent")
     assert db.query(Alerte).filter(Alerte.statut == "active").count() == 1
@@ -83,10 +83,10 @@ def test_legacy_duplicates_are_resolved(db):
 def test_alert_resolved_only_after_min_lifetime(db):
     young = Alerte(type="RessourceCritique", module_origine="supervision", severite="critique",
                    message="Alerte préventive : TTF estimé à 1.0h pour cpu_percent sur SRV-TEST-01",
-                   statut="active", date_creation=datetime.utcnow() - timedelta(minutes=2))
+                   statut="active", date_creation=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=2))
     old = Alerte(type="RessourceCritique", module_origine="supervision", severite="critique",
                  message="Alerte préventive : TTF estimé à 1.0h pour ram_percent sur SRV-TEST-01",
-                 statut="active", date_creation=datetime.utcnow() - timedelta(minutes=30))
+                 statut="active", date_creation=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=30))
     db.add_all([young, old]); db.commit()
     _add_series(db, 1, "cpu_percent", [40.0] * 130)
     _add_series(db, 1, "ram_percent", [40.0] * 130)
@@ -103,10 +103,10 @@ def test_calculate_ttf_no_longer_touches_health(db):
 
 
 def test_health_uses_recent_ttf_and_targeted_security_events(db):
-    db.add(Prediction(equipement_id=1, metrique="disk_percent", ttf_estime=3.0, date_calcul=datetime.utcnow()))
-    db.add(Prediction(equipement_id=1, metrique="cpu_percent", ttf_estime=30.0, date_calcul=datetime.utcnow()))
+    db.add(Prediction(equipement_id=1, metrique="disk_percent", ttf_estime=3.0, date_calcul=datetime.now(timezone.utc).replace(tzinfo=None)))
+    db.add(Prediction(equipement_id=1, metrique="cpu_percent", ttf_estime=30.0, date_calcul=datetime.now(timezone.utc).replace(tzinfo=None)))
     db.add(Prediction(equipement_id=1, metrique="ram_percent", ttf_estime=1.0,
-                      date_calcul=datetime.utcnow() - timedelta(hours=1)))  # trop ancienne : ignorée
+                      date_calcul=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)))  # trop ancienne : ignorée
     db.add(EvenementSecurite(source_ip="198.51.100.45", equipement_id=1, type_evenement="SSH_BRUTEFORCE",
                              score_anomalie=-0.7, severite="critique"))
     db.commit()
@@ -132,9 +132,9 @@ def test_reused_old_alert_is_not_resolved_right_after_a_breach(db):
     """Une vieille alerte ré-activée par un nouveau dépassement reste vivante ALERT_MIN_LIFETIME."""
     db.add(Alerte(type="RessourceCritique", module_origine="supervision", severite="critique",
                   message="Alerte préventive : TTF estimé à 9.0h pour disk_percent sur SRV-TEST-01",
-                  statut="active", date_creation=datetime.utcnow() - timedelta(hours=5)))
+                  statut="active", date_creation=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=5)))
     db.commit()
-    end = datetime.utcnow()
+    end = datetime.now(timezone.utc).replace(tzinfo=None)
     points = [(end - timedelta(minutes=(5 - i) * 8), v) for i, v in enumerate([60.0, 66.0, 72.0, 78.0, 83.0, 88.0])]
     assert supervision_service.evaluate_series(db, 1, "disk_percent", points, min_points=5) < 1.0
     _add_series(db, 1, "disk_percent", [50.0] * 200)         # la tendance disparaît juste après

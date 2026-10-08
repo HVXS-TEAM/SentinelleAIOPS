@@ -2,10 +2,53 @@
 page_template.py — Socle de démarrage unifié pour l'ensemble des pages de Sentinelle AIOps.
 """
 from pathlib import Path
+import os
+import sys
+import time
+
 import streamlit as st
-from streamlit_autorefresh import st_autorefresh
 from components import load_theme, sidebar_nav, top_header
 import api_client as api
+
+# ── Auto-refresh natif (Streamlit ≥ 1.37, cf. décision D1) ────────────────────
+# Remplace l'ancien composant tiers abandonné (dernière release : juin 2023), qui
+# relançait toute la page toutes les 5 s. L'équivalent natif est un fragment armé
+# avec `run_every` qui demande un rerun complet à chaque tick (doc officielle :
+# « To trigger an app rerun from inside a fragment, call st.rerun() directly »).
+# Garde anti-boucle : le corps d'un fragment s'exécute AUSSI à chaque run complet,
+# donc un `st.rerun()` inconditionnel bouclerait à l'infini sans attendre le tick.
+# On n'ordonne le rerun que si ≥ 5 s se sont écoulées depuis le précédent.
+# (`run_every` dynamique au décorateur est impossible ici : page_template est un
+# module importé une seule fois, son décorateur ne se réévalue pas à chaque run —
+# d'où la garde temporelle explicite, robuste dans le navigateur comme sous test.)
+# Pause soutenance : quand le fragment n'est plus rendu, Streamlit annule son timer ;
+# le bouton pause du panneau démo force un rerun qui (dés)arme le tick.
+# Tests AppTest : fragment désarmé (détection `streamlit.testing` ou
+# `SENTINELLE_NO_AUTOREFRESH=1`) pour laisser les scripts de vérification se terminer.
+_AUTO_REFRESH_SECONDS = 5
+_LAST_TICK_KEY = "_sentinelle_last_auto_refresh"
+
+
+def _under_test() -> bool:
+    """Vrai sous AppTest (scripts verif_*) : pas d'auto-refresh."""
+    if os.environ.get("SENTINELLE_NO_AUTOREFRESH") == "1":
+        return True
+    return any(k == "streamlit.testing" or k.startswith("streamlit.testing.") for k in sys.modules)
+
+
+@st.fragment(run_every=_AUTO_REFRESH_SECONDS)
+def _auto_refresh_tick() -> None:
+    """Tick : ordonne un rerun complet uniquement si l'intervalle est écoulé."""
+    if _under_test():
+        return
+    now = time.monotonic()
+    last = st.session_state.get(_LAST_TICK_KEY)
+    if last is None:
+        st.session_state[_LAST_TICK_KEY] = now
+        return
+    if now - last >= _AUTO_REFRESH_SECONDS:
+        st.session_state[_LAST_TICK_KEY] = now
+        st.rerun()
 
 _LOGO_PATH = Path(__file__).parent / "static" / "logo.png"
 _DEFAULT_ICON = str(_LOGO_PATH) if _LOGO_PATH.exists() else "🛡️"
@@ -24,7 +67,7 @@ def _demo_panel_impl() -> None:
     with st.sidebar:
         with st.expander("🎯 Démonstration BTS (1-Clic)", expanded=False):
 
-            if st.button("🔴 Injecter Brute-force SSH", key="demo_btn_bruteforce", use_container_width=True):
+            if st.button("🔴 Injecter Brute-force SSH", key="demo_btn_bruteforce", width="stretch"):
                 result = api.simulate_inject_bruteforce()
                 if result:
                     st.toast("🚨 Attaque simulée sur 198.51.100.45 !")
@@ -32,7 +75,7 @@ def _demo_panel_impl() -> None:
                     st.toast("⚠️ Échec de l'appel API (backend indisponible ?)")
                 st.rerun()
 
-            if st.button("🟡 Simuler Saturation Disque", key="demo_btn_stressdisk", use_container_width=True):
+            if st.button("🟡 Simuler Saturation Disque", key="demo_btn_stressdisk", width="stretch"):
                 result = api.simulate_stress_disk()
                 if result:
                     st.toast("⚠️ Stress disque déclenché sur SRV-APP-01 !")
@@ -40,7 +83,7 @@ def _demo_panel_impl() -> None:
                     st.toast("⚠️ Échec de l'appel API (backend indisponible ?)")
                 st.rerun()
 
-            if st.button("🔵 Injecter Faille CIS Cisco", key="demo_btn_cisflaw", use_container_width=True):
+            if st.button("🔵 Injecter Faille CIS Cisco", key="demo_btn_cisflaw", width="stretch"):
                 result = api.simulate_cis_flaw()
                 if result:
                     nb = len(result.get("non_conformites", []))
@@ -49,7 +92,7 @@ def _demo_panel_impl() -> None:
                     st.toast("⚠️ Échec de l'appel API (backend indisponible ?)")
                 st.rerun()
 
-            if st.button("🟢 Réinitialiser Démo (Reset)", key="demo_btn_reset", use_container_width=True):
+            if st.button("🟢 Réinitialiser Démo (Reset)", key="demo_btn_reset", width="stretch"):
                 result = api.simulate_reset()
                 if result:
                     st.toast("✅ Démo réinitialisée à l'état nominal !")
@@ -60,7 +103,7 @@ def _demo_panel_impl() -> None:
             st.markdown("---")
             paused = st.session_state.get("demo_autorefresh_paused", False)
             label = "▶️ Reprendre l'auto-refresh" if paused else "⏸ Mettre en pause l'auto-refresh"
-            if st.button(label, key="demo_btn_pause_refresh", use_container_width=True):
+            if st.button(label, key="demo_btn_pause_refresh", width="stretch"):
                 st.session_state.demo_autorefresh_paused = not paused
                 st.rerun()
 
@@ -115,7 +158,11 @@ def page_bootstrap(
 
     # Auto-refresh discret (5s) — cf. Phase_3.md §3.4. Suspendu si l'utilisateur
     # a cliqué sur pause, pour figer l'écran pendant les explications au jury.
+    # Note AppTest : les scripts de vérification positionnent eux-mêmes
+    # demo_autorefresh_paused=True, car le timer du fragment empêcherait sinon
+    # `at.run()` de se terminer (l'ancien st_autorefresh ne posait pas ce
+    # problème en environnement de test).
     if not st.session_state.get("demo_autorefresh_paused", False):
-        st_autorefresh(interval=5000, key="sentinelle_datarefresh")
+        _auto_refresh_tick()
 
     top_header(search_placeholder=search_placeholder, page_title=header_title)

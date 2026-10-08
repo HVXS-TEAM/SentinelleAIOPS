@@ -18,6 +18,7 @@ Le scheduler est démarré/arrêté via le `lifespan` de FastAPI dans main.py.
 import logging
 import random
 from datetime import datetime, timezone
+from app.core.time_utils import utcnow_naive
 
 import psutil
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -110,7 +111,7 @@ def collect_telemetry() -> None:
                     equipement_id=eq.id,
                     type_metrique=type_metrique,
                     valeur=valeur,
-                    horodatage=datetime.utcnow()
+                    horodatage=utcnow_naive()
                 ))
         db.commit()
         logger.debug("Télémétrie collectée pour %d équipement(s).", len(equipements))

@@ -17,6 +17,7 @@ générées par le scheduler (Phase 1).
 """
 
 from datetime import datetime, timedelta
+from app.core.time_utils import utcnow_naive
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends
@@ -82,7 +83,7 @@ def inject_bruteforce(db: Session = Depends(get_db)):
     target = _get_or_create_equipement(db, target_nom, "192.168.20.10", "Serveur")
     _snapshot_health(target.id, target.health_score)
 
-    now = datetime.utcnow()
+    now = utcnow_naive()
     log_lines: List[str] = []
 
     # Bruit "normal" : plusieurs IP légitimes avec 1 à 2 tentatives échouées
@@ -152,7 +153,7 @@ def stress_disk(db: Session = Depends(get_db)):
     target = _get_or_create_equipement(db, "SRV-APP-01", "192.168.20.12", "Serveur")
     _snapshot_health(target.id, target.health_score)
 
-    now = datetime.utcnow()
+    now = utcnow_naive()
     progression = [60.0, 66.0, 72.0, 78.0, 83.0, 88.0]
     inserted_ids = []
 

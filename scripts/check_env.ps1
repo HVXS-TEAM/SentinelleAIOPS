@@ -65,6 +65,17 @@ if ($pyOk) {
     }
 }
 
+# ── 2b. version Streamlit (D1 : modernisation 1.65.0, refresh natif) ──────────
+$stVersion = (& $VenvPython -c "import streamlit; print(streamlit.__version__)" 2>$null | Select-Object -Last 1)
+if ($stVersion) {
+    $stVersion = "$stVersion".Trim()
+    $parts = $stVersion.Split(".")
+    $stOk = ([int]$parts[0] -gt 1) -or (([int]$parts[0] -eq 1) -and ([int]$parts[1] -ge 65))
+    Check "streamlit >= 1.65 (détecté : $stVersion)" $stOk "Installez le wheel offline : pip install --no-index streamlit-1.65.0-py3-none-any.whl"
+} else {
+    Check "streamlit détectable" $false "Réinstallez les dépendances du frontend."
+}
+
 # ── 3. base SQLite ───────────────────────────────────────────────────────
 $db = Join-Path $Root "backend\sentinelle_aiops.db"
 Check "base backend/sentinelle_aiops.db présente" (Test-Path $db) "Lancez 'py scripts\init_db.py' (ATTENTION : recrée la base et écrase les données) ou démarrez le backend (création auto)."

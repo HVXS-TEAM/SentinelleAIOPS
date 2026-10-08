@@ -9,6 +9,7 @@ audits, sauvegardes de configuration et évènements de sécurité.
 """
 
 from datetime import datetime, timedelta
+from app.core.time_utils import utcnow_naive
 from typing import Dict, Optional
 
 from sqlalchemy import select
@@ -41,7 +42,7 @@ def purge_old_data(db: Optional[Session] = None, now: Optional[datetime] = None)
     """Supprime les métriques/prédictions de plus de 24 h et les alertes résolues de plus de 24 h."""
     own_session = db is None
     db = db or SessionLocal()
-    now = now or datetime.utcnow()
+    now = now or utcnow_naive()
     try:
         counts = {
             "metriques": _delete_where(db, Metrique, Metrique.horodatage < now - RETENTION_METRICS),

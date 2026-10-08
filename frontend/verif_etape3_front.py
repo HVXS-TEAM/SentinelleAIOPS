@@ -55,6 +55,10 @@ def admin_secret() -> str:
 
 def fresh():
     at = AppTest.from_file(str(ROOT / "app.py"), default_timeout=40)
+    # Coupe le tick d'auto-refresh : en AppTest, le timer du fragment empêcherait
+    # sinon run() de se terminer (ancien st_autorefresh ne posait pas ce problème
+    # en environnement de test).
+    at.session_state["demo_autorefresh_paused"] = True
     at.run()
     return at
 
@@ -83,6 +87,8 @@ def open_page(page, user, role, token=None):
     at.session_state["username"] = user
     at.session_state["role"] = role
     at.session_state["token"] = token_of(user) if token is None else token
+    # Coupe le tick d'auto-refresh (cf. fresh()).
+    at.session_state["demo_autorefresh_paused"] = True
     at.switch_page(page)
     at.run()
     return at

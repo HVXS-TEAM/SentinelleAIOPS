@@ -1,4 +1,4 @@
-from datetime import datetime
+from app.core.time_utils import utcnow_naive
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Response
 from app.api.deps import get_current_user, require_roles, OPS_ROLES, ADMIN_ROLES
@@ -41,7 +41,7 @@ def generate_pdf_report(db: Session = Depends(get_db), current_user: Utilisateur
         pdf = reporting_service.build_pdf_report(db, generated_by=current_user.identifiant)
     except ReportUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    filename = f"rapport_sentinelle_{datetime.utcnow().strftime('%Y%m%d_%H%M')}.pdf"
+    filename = f"rapport_sentinelle_{utcnow_naive().strftime('%Y%m%d_%H%M')}.pdf"
     return Response(
         content=pdf,
         media_type="application/pdf",

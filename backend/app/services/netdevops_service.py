@@ -1,7 +1,7 @@
 import requests
 import json
 import re
-from datetime import datetime
+from app.core.time_utils import utcnow_naive
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -96,7 +96,7 @@ Configuration:
             equipement_id=equipement_id,
             contenu=config_text,
             hash_integrite=hash_val,
-            date_sauvegarde=datetime.utcnow()
+            date_sauvegarde=utcnow_naive()
         )
         db.add(backup)
 
@@ -121,7 +121,7 @@ Configuration:
                 criticite=item["criticite"],
                 correctif_propose=item["correctif_propose"],
                 statut="non_corrige",
-                date_audit=datetime.utcnow()
+                date_audit=utcnow_naive()
             )
             db.add(audit)
             audits_db.append(audit)

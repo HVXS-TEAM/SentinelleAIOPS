@@ -1,5 +1,5 @@
 """Tests de l'étape 2 : rétention automatique et remise à zéro des données de démo."""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -74,8 +74,8 @@ def test_purge_keeps_audits_backups_and_events(db):
 
 
 def test_reset_demo_data_cleans_and_recomputes_health(db):
-    recent = datetime.utcnow() - timedelta(minutes=5)
-    old = datetime.utcnow() - timedelta(hours=48)
+    recent = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
+    old = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=48)
     db.add_all([
         AuditReseau(equipement_id=1, constat="c", regle_cis="CIS-1.1", criticite="elevee"),
         SauvegardeConfig(equipement_id=1, contenu="x", hash_integrite="h"),

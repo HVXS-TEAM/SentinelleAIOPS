@@ -45,6 +45,10 @@ def open_page(token_value="__auto__"):
     at.session_state["username"] = USER
     at.session_state["role"] = "Technicien"
     at.session_state["token"] = token() if token_value == "__auto__" else token_value
+    # Coupe le tick d'auto-refresh : en AppTest, le timer du fragment empêcherait
+    # sinon run() de se terminer (ancien st_autorefresh ne posait pas ce problème
+    # en environnement de test).
+    at.session_state["demo_autorefresh_paused"] = True
     at.switch_page("pages/3_Supervision.py")
     at.run()
     return at

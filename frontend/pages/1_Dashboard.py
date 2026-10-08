@@ -20,7 +20,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from page_template import page_bootstrap
@@ -219,7 +219,7 @@ def _time_ago(iso_str: str) -> str:
         dt = datetime.fromisoformat(iso_str)
     except Exception:
         return ""
-    seconds = (datetime.utcnow() - dt).total_seconds()
+    seconds = (datetime.now(timezone.utc).replace(tzinfo=None) - dt).total_seconds()
     if seconds < 60:
         return "À l'instant"
     minutes = int(seconds // 60)
@@ -461,7 +461,7 @@ with col_chart:
             ),
             height=320,
         )
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
 with col_alerts:
     st.markdown("""
@@ -579,4 +579,4 @@ with col_pie:
             legend=dict(orientation="v", yanchor="middle", y=0.5, xanchor="left", x=1.02, font=dict(size=12, color="#e0e3e6"), bgcolor="rgba(0,0,0,0)"),
             height=240,
         )
-        st.plotly_chart(fig_d, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_d, width="stretch", config={"displayModeBar": False})

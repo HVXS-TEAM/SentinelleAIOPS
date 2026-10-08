@@ -12,7 +12,7 @@ Toutes les données proviennent de l'API (api_client) :
       calcul de TTF côté serveur) pour la partie pointillée.
 """
 import os, sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -117,7 +117,7 @@ def _forecast(values: list[float], metric: str, n: int = 5) -> list[float]:
 # ── Données ───────────────────────────────────────────────────────────────────
 equipements = api.get_equipements()
 names = {e["id"]: e["nom"] for e in equipements}
-now = datetime.utcnow()
+now = datetime.now(timezone.utc).replace(tzinfo=None)
 predictions = _latest_predictions(api.get_predictions(), now)
 worst = predictions[0] if predictions else None
 

@@ -152,7 +152,7 @@ if not st.session_state.authenticated:
                 "CODE MFA (6 chiffres)", max_chars=6, placeholder="123456", key="login_totp",
             )
 
-        if st.button("Se connecter →", key="login_submit", use_container_width=True):
+        if st.button("Se connecter →", key="login_submit", width="stretch"):
             payload = {"username": identifiant, "password": mot_de_passe}
             if st.session_state.get("mfa_pending", False) and code_totp:
                 payload["totp_code"] = code_totp.strip()

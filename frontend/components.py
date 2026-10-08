@@ -286,11 +286,11 @@ def top_header(
                     unsafe_allow_html=True,
                 )
         with col_icons:
-            with st.popover("🔔", use_container_width=False):
+            with st.popover("🔔", width="content"):
                 st.markdown("**Notifications**")
                 items = notifications or ["Aucune nouvelle notification."]
                 for i, item in enumerate(items):
-                    if st.button(item, key=f"notif_item_{i}", use_container_width=True):
+                    if st.button(item, key=f"notif_item_{i}", width="stretch"):
                         if on_notification_click:
                             on_notification_click(item)
                         else:

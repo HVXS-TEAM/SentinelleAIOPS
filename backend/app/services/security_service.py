@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from app.core.time_utils import utcnow_naive
 from typing import List, Dict, Any, Optional
 import numpy as np
 from sqlalchemy.orm import Session
@@ -87,7 +87,7 @@ class SecurityService:
                     type_evenement="SSH_BRUTEFORCE" if ip_stats[ip]["count"] >= 5 else "ANOMALY_LOG",
                     score_anomalie=score,
                     severite=severite,
-                    horodatage=datetime.utcnow()
+                    horodatage=utcnow_naive()
                 )
                 db.add(ev_db)
                 results.append(ev_db)

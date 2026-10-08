@@ -12,6 +12,7 @@ Corrections de l'étape 1 :
 """
 
 from datetime import datetime, timedelta
+from app.core.time_utils import utcnow_naive
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -139,7 +140,7 @@ class SupervisionService:
         values = [v for _, v in points]
         ttf_hours = self.estimate_ttf(times_h, values, min_points=min_points)
 
-        now = datetime.utcnow()
+        now = utcnow_naive()
         if ttf_hours is not None:
             db.add(Prediction(
                 equipement_id=equipement_id, metrique=type_metrique,

@@ -10,7 +10,8 @@ Le score est recalculé de zéro à partir de l'état réel de la base :
     - dernier taux d'occupation disque > 90 %       (-25)
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
+from app.core.time_utils import utcnow_naive
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -28,7 +29,7 @@ class InventoryService:
         if not eq:
             return 100.0
 
-        now = datetime.utcnow()
+        now = utcnow_naive()
         score = 100.0
 
         # 1) Audits CIS ouverts

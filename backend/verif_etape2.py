@@ -7,7 +7,7 @@ import os
 import sqlite3
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -43,7 +43,7 @@ def check(label, cond, detail=""):
 if not settings.DATABASE_URL.startswith("sqlite"):
     print("Ce script lit directement la base SQLite ; DATABASE_URL n'est pas SQLite."); sys.exit(2)
 db_path = engine.url.database
-now = datetime.utcnow()
+now = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def scalar(sql, *params):
@@ -59,7 +59,7 @@ check("l'API répond", S.get("http://localhost:8000/", timeout=5).status_code ==
 age = 9e9
 for _ in range(9):                                   # le 1er tick de télémétrie arrive ~10 s après le démarrage
     last = scalar("SELECT max(horodatage) FROM metriques")
-    age = (datetime.utcnow() - datetime.fromisoformat(last)).total_seconds() if last else 9e9
+    age = (datetime.now(timezone.utc).replace(tzinfo=None) - datetime.fromisoformat(last)).total_seconds() if last else 9e9
     if age < 30:
         break
     time.sleep(3)

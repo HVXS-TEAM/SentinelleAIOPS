@@ -5,7 +5,7 @@ Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérificat
 """
 import os, sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 import streamlit as st
 
 _LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
@@ -41,7 +41,7 @@ nb_critical = sum(1 for e in events if e.get("severite") == "critique")
 nb_anomalies = sum(1 for e in events if e.get("severite") == "warning")
 ips_critiques = {e["source_ip"] for e in events if e.get("severite") == "critique"}
 
-now = datetime.utcnow()
+now = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _events_per_sec(evts: list, window_seconds: int = 60) -> float:
