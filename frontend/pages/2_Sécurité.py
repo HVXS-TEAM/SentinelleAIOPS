@@ -5,6 +5,7 @@ Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérificat
 """
 import os, sys
 from pathlib import Path
+from datetime import datetime
 import streamlit as st
 
 _LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
@@ -18,6 +19,7 @@ st.set_page_config(
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from page_template import page_bootstrap
+import api_client as api
 
 # ── Garde d'authentification ─────────────────────────────────────────────────
 if not st.session_state.get("authenticated", False):
@@ -28,6 +30,61 @@ page_bootstrap(
     page_title="Sécurité Overview",
     search_placeholder="Search threats, IPs, policies..."
 )
+
+# ── Données réelles (API) ─────────────────────────────────────────────────────
+events = api.get_security_events(limit=50)
+alertes_securite = api.get_alertes()
+alertes_securite = [a for a in alertes_securite if a.get("module_origine") == "securite"]
+audits = api.get_audits()
+
+nb_critical = sum(1 for e in events if e.get("severite") == "critique")
+nb_anomalies = sum(1 for e in events if e.get("severite") == "warning")
+ips_critiques = {e["source_ip"] for e in events if e.get("severite") == "critique"}
+
+now = datetime.utcnow()
+
+
+def _events_per_sec(evts: list, window_seconds: int = 60) -> float:
+    """Débit d'événements/seconde sur la dernière fenêtre glissante."""
+    count = 0
+    for e in evts:
+        try:
+            dt = datetime.fromisoformat(e["horodatage"])
+        except Exception:
+            continue
+        if (now - dt).total_seconds() <= window_seconds:
+            count += 1
+    return round(count / window_seconds, 2)
+
+
+events_per_sec = _events_per_sec(events)
+
+nb_alertes_securite = len(alertes_securite)
+nb_alertes_traitees = sum(1 for a in alertes_securite if a.get("statut") != "active")
+block_rate = round(100 * nb_alertes_traitees / nb_alertes_securite) if nb_alertes_securite else 100
+
+# CIS Benchmark : 3 règles surveillées, regroupées en 3 catégories (cf.
+# netdevops_service.CIS_RULES) pour retrouver l'esprit du radar Identity/
+# Network/Data du mockup original, sans inventer de données.
+CATEGORIES = {
+    "Identity & Access": "CIS-1.1",   # Password Encryption
+    "Network Config": "CIS-2.2",      # SNMP v1/v2
+    "Data Protection": "CIS-3.1",     # Bannière légale MOTD
+}
+WEIGHT = {"elevee": 35, "moyenne": 15, "faible": 5}
+
+
+def _categorie_score(prefix: str) -> int:
+    non_corriges = [
+        a for a in audits
+        if a.get("regle_cis", "").startswith(prefix) and a.get("statut") != "corrige"
+    ]
+    penalite = sum(WEIGHT.get(a.get("criticite"), 10) for a in non_corriges)
+    return max(0, 100 - penalite)
+
+
+scores_categories = {nom: _categorie_score(prefix) for nom, prefix in CATEGORIES.items()}
+cis_compliant_global = round(sum(scores_categories.values()) / len(scores_categories)) if scores_categories else 100
 
 # ── STYLES DÉDIÉS SÉCURITÉ ───────────────────────────────────────────────────
 st.html("""
@@ -317,7 +374,7 @@ col_radar, col_bench = st.columns([2.3, 1.1])
 
 with col_radar:
     st.html(
-        """
+        f"""
         <div class="radar-container">
             <div class="radar-header">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -333,11 +390,11 @@ with col_radar:
                 <div style="display: flex; gap: 16px; align-items: center; font-family: var(--font-mono); font-size: 11px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span style="width: 8px; height: 8px; border-radius: 50%; background: #ffb4ab;"></span>
-                        <span style="color: var(--on-surface-variant);">Critical (1)</span>
+                        <span style="color: var(--on-surface-variant);">Critical ({nb_critical})</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <span style="width: 8px; height: 8px; border-radius: 50%; background: #81d0f8;"></span>
-                        <span style="color: var(--on-surface-variant);">Anomalies (2)</span>
+                        <span style="color: var(--on-surface-variant);">Anomalies ({nb_anomalies})</span>
                     </div>
                 </div>
             </div>
@@ -347,23 +404,23 @@ with col_radar:
                 <div class="radar-ring-1"></div>
                 <div class="radar-ring-2"></div>
                 <div class="radar-ring-3"></div>
-                <div class="blip-critical pulse-critical"></div>
-                <div class="blip-anomaly-1"></div>
-                <div class="blip-anomaly-2"></div>
+                {'<div class="blip-critical pulse-critical"></div>' if nb_critical > 0 else ''}
+                {'<div class="blip-anomaly-1"></div>' if nb_anomalies > 0 else ''}
+                {'<div class="blip-anomaly-2"></div>' if nb_anomalies > 1 else ''}
             </div>
 
             <div class="radar-hud">
                 <div class="hud-tile">
                     <div class="hud-label">ACTIVE VECTORS</div>
-                    <div class="hud-value" style="color: var(--error, #ffb4ab);">4</div>
+                    <div class="hud-value" style="color: var(--error, #ffb4ab);">{len(ips_critiques)}</div>
                 </div>
                 <div class="hud-tile">
                     <div class="hud-label">EVENTS/SEC</div>
-                    <div class="hud-value" style="color: var(--primary, #78d8ba);">1,248</div>
+                    <div class="hud-value" style="color: var(--primary, #78d8ba);">{events_per_sec}</div>
                 </div>
                 <div class="hud-tile">
                     <div class="hud-label">BLOCK RATE</div>
-                    <div class="hud-value" style="color: var(--secondary, #81d0f8);">99.8%</div>
+                    <div class="hud-value" style="color: var(--secondary, #81d0f8);">{block_rate}%</div>
                 </div>
             </div>
         </div>
@@ -371,8 +428,19 @@ with col_radar:
     )
 
 with col_bench:
+    id_access = scores_categories["Identity & Access"]
+    net_config = scores_categories["Network Config"]
+    data_protect = scores_categories["Data Protection"]
+
+    def _bench_color(score: int) -> str:
+        if score >= 85:
+            return "var(--primary, #78d8ba)"
+        if score >= 70:
+            return "var(--secondary, #81d0f8)"
+        return "var(--error, #ffb4ab)"
+
     st.html(
-        """
+        f"""
         <div class="bench-card">
             <div style="display: flex; align-items: center; gap: 8px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#81d0f8" stroke-width="2">
@@ -384,10 +452,10 @@ with col_bench:
                 </span>
             </div>
 
-            <div style="width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(var(--primary, #78d8ba) 0% 85%, #272a2d 85% 100%); display: flex; align-items: center; justify-content: center; margin: 10px auto; padding: 8px;">
+            <div style="width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(var(--primary, #78d8ba) 0% {cis_compliant_global}%, #272a2d {cis_compliant_global}% 100%); display: flex; align-items: center; justify-content: center; margin: 10px auto; padding: 8px;">
                 <div style="width: 100%; height: 100%; border-radius: 50%; background-color: var(--surface-container, #1d2022); display: flex; flex-direction: column; align-items: center; justify-content: center;">
                     <div style="font-family: var(--font-mono); font-size: 28px; font-weight: 600; color: var(--on-surface, #e0e3e6); line-height: 1;">
-                        85<span style="font-size: 18px; font-weight: 500;">%</span>
+                        {cis_compliant_global}<span style="font-size: 18px; font-weight: 500;">%</span>
                     </div>
                     <div style="font-family: var(--font-mono); font-size: 10px; color: var(--primary, #78d8ba); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px;">
                         CIS COMPLIANT
@@ -399,28 +467,28 @@ with col_bench:
                 <div>
                     <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
                         <span style="color: var(--on-surface-variant);">Identity & Access</span>
-                        <span style="color: var(--on-surface); font-weight: 600;">92%</span>
+                        <span style="color: {_bench_color(id_access)}; font-weight: 600;">{id_access}%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div style="width: 92%; height: 100%; background-color: var(--primary, #78d8ba); border-radius: 9999px;"></div>
+                        <div style="width: {id_access}%; height: 100%; background-color: {_bench_color(id_access)}; border-radius: 9999px;"></div>
                     </div>
                 </div>
                 <div>
                     <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
                         <span style="color: var(--on-surface-variant);">Network Config</span>
-                        <span style="color: var(--error, #ffb4ab); font-weight: 600;">64%</span>
+                        <span style="color: {_bench_color(net_config)}; font-weight: 600;">{net_config}%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div style="width: 64%; height: 100%; background-color: var(--error, #ffb4ab); border-radius: 9999px;"></div>
+                        <div style="width: {net_config}%; height: 100%; background-color: {_bench_color(net_config)}; border-radius: 9999px;"></div>
                     </div>
                 </div>
                 <div>
                     <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px;">
                         <span style="color: var(--on-surface-variant);">Data Protection</span>
-                        <span style="color: var(--secondary, #81d0f8); font-weight: 600;">88%</span>
+                        <span style="color: {_bench_color(data_protect)}; font-weight: 600;">{data_protect}%</span>
                     </div>
                     <div class="progress-bar-bg">
-                        <div style="width: 88%; height: 100%; background-color: var(--secondary, #81d0f8); border-radius: 9999px;"></div>
+                        <div style="width: {data_protect}%; height: 100%; background-color: {_bench_color(data_protect)}; border-radius: 9999px;"></div>
                     </div>
                 </div>
             </div>
@@ -431,8 +499,62 @@ with col_bench:
 st.html("<div style='height: 18px;'></div>")
 
 # ── SECTION INFÉRIEURE : RECENT SECURITY INCIDENTS (PLEINE LARGEUR) ───────────
-st.html(
+def _fmt_ts(iso_str: str) -> str:
+    try:
+        return datetime.fromisoformat(iso_str).strftime("%H:%M:%S UTC")
+    except Exception:
+        return "—"
+
+
+SEVERITY_BADGE = {
+    "critique": ('rgba(147, 0, 10, 0.4)', 'rgba(255, 180, 171, 0.3)', '#ffdad6', '#ffb4ab', 'CRITICAL'),
+    "warning": ('rgba(102, 77, 3, 0.4)', 'rgba(255, 204, 128, 0.3)', '#ffe082', '#ffe082', 'HIGH'),
+    "info": ('rgba(1, 112, 148, 0.25)', 'rgba(129, 208, 248, 0.3)', '#81d0f8', '#81d0f8', 'MEDIUM'),
+}
+
+if not events:
+    incidents_rows_html = """
+    <tr>
+        <td colspan="6" style="text-align:center; padding: 24px; color: var(--on-surface-variant);">
+            Aucun événement de sécurité détecté pour le moment.
+        </td>
+    </tr>
     """
+else:
+    incidents_rows_html = ""
+    for e in sorted(events, key=lambda x: x.get("horodatage", ""), reverse=True)[:10]:
+        severite = e.get("severite", "info")
+        bg, border, color, dot, label = SEVERITY_BADGE.get(severite, SEVERITY_BADGE["info"])
+        row_class = "critical-row" if severite == "critique" else ""
+        if severite == "critique":
+            action_html = '<button class="btn-investigate">Investigate</button>'
+        else:
+            action_html = """
+            <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--primary, #78d8ba); display: inline-flex; align-items: center; gap: 4px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Blocked
+            </span>
+            """
+        incidents_rows_html += f"""
+        <tr class="{row_class}">
+            <td>
+                <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: {bg}; border: 1px solid {border}; color: {color}; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;">
+                    <span style="width: 6px; height: 6px; border-radius: 50%; background: {dot};"></span>
+                    {label}
+                </span>
+            </td>
+            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">{_fmt_ts(e.get("horodatage", ""))}</td>
+            <td style="font-weight: 600; color: var(--on-surface);">{e.get("type_evenement", "")}</td>
+            <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">{e.get("source_ip", "")}</td>
+            <td style="color: var(--on-surface-variant);">{e.get("utilisateur") or "—"}</td>
+            <td style="text-align: right;">{action_html}</td>
+        </tr>
+        """
+
+st.html(
+    f"""
     <div class="incidents-card">
         <div class="incidents-header">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -445,9 +567,9 @@ st.html(
                     RECENT SECURITY INCIDENTS
                 </span>
             </div>
-            <a style="font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--primary, #78d8ba); cursor: pointer; text-decoration: none;">
-                View All Logs
-            </a>
+            <span style="font-family: var(--font-mono); font-size: 11px; color: var(--on-surface-variant);">
+                {len(events)} événement(s) au total
+            </span>
         </div>
 
         <div style="overflow-x: auto;">
@@ -463,78 +585,7 @@ st.html(
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Row 1: CRITICAL -->
-                    <tr class="critical-row">
-                        <td>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(147, 0, 10, 0.4); border: 1px solid rgba(255, 180, 171, 0.3); color: #ffdad6; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;">
-                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #ffb4ab;"></span>
-                                CRITICAL
-                            </span>
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">14:32:01 UTC</td>
-                        <td style="font-weight: 600; color: var(--on-surface);">IP Spoofing Attempt</td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">192.168.x.x (Spoofed)</td>
-                        <td style="color: var(--on-surface-variant);">Core Router 01</td>
-                        <td style="text-align: right;">
-                            <button class="btn-investigate">Investigate</button>
-                        </td>
-                    </tr>
-
-                    <!-- Row 2: HIGH -->
-                    <tr>
-                        <td>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(102, 77, 3, 0.4); border: 1px solid rgba(255, 204, 128, 0.3); color: #ffe082; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;">
-                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #ffe082;"></span>
-                                HIGH
-                            </span>
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">14:15:44 UTC</td>
-                        <td style="font-weight: 600; color: var(--on-surface);">Brute Force Detection</td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">45.33.12.x</td>
-                        <td style="color: var(--on-surface-variant);">Auth Gateway</td>
-                        <td style="text-align: right;">
-                            <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--primary, #78d8ba); display: inline-flex; align-items: center; gap: 4px;">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                    <polyline points="20 6 9 17 4 12"/>
-                                </svg>
-                                Blocked
-                            </span>
-                        </td>
-                    </tr>
-
-                    <!-- Row 3: MEDIUM -->
-                    <tr>
-                        <td>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(1, 112, 148, 0.25); border: 1px solid rgba(129, 208, 248, 0.3); color: #81d0f8; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;">
-                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #81d0f8;"></span>
-                                MEDIUM
-                            </span>
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">13:59:12 UTC</td>
-                        <td style="font-weight: 600; color: var(--on-surface);">Unusual Traffic Volume</td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">Internal Subnet B</td>
-                        <td style="color: var(--on-surface-variant);">DB Cluster 03</td>
-                        <td style="text-align: right;">
-                            <button class="btn-investigate">Review</button>
-                        </td>
-                    </tr>
-
-                    <!-- Row 4: MEDIUM -->
-                    <tr>
-                        <td>
-                            <span style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 4px; background: rgba(1, 112, 148, 0.25); border: 1px solid rgba(129, 208, 248, 0.3); color: #81d0f8; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em;">
-                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #81d0f8;"></span>
-                                MEDIUM
-                            </span>
-                        </td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">13:45:00 UTC</td>
-                        <td style="font-weight: 600; color: var(--on-surface);">Suspicious API Calls</td>
-                        <td style="font-family: var(--font-mono); font-size: 12px; color: var(--on-surface-variant);">185.20.x.x</td>
-                        <td style="color: var(--on-surface-variant);">Public API v2</td>
-                        <td style="text-align: right;">
-                            <button class="btn-investigate">Review</button>
-                        </td>
-                    </tr>
+                    {incidents_rows_html}
                 </tbody>
             </table>
         </div>

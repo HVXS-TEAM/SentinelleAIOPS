@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
     
+    # CORS : origines autorisées (séparées par des virgules). Streamlit appelle l'API côté serveur,
+    # le navigateur n'a donc normalement jamais besoin d'appeler l'API directement.
+    CORS_ORIGINS: str = "http://localhost:8501,http://127.0.0.1:8501"
+
     # Ollama LLM Config
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3"
@@ -28,5 +32,7 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
 
+
+DEFAULT_SECRET_KEY = "sentinelle_aiops_super_secret_key_change_in_production_2026"
 
 settings = Settings()

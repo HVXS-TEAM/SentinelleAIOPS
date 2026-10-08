@@ -112,6 +112,11 @@ if not st.session_state.authenticated:
 
 
         # ── Champ PROFILS ──────────────────────────────────────────────────
+        # [etape3] message affiché après une session expirée
+        _notice = st.session_state.pop("login_notice", "")
+        if _notice:
+            st.warning(_notice)
+
         profil = st.selectbox(
             "PROFILS",
             ["Administrateur", "Technicien", "Visiteur"],
@@ -139,39 +144,58 @@ if not st.session_state.authenticated:
         )
 
         # ── Bouton Se connecter ────────────────────────────────────────────
+        # [etape3] Double authentification : le champ n'apparaît que si le back-end demande le code TOTP
+        code_totp = ""
+        if st.session_state.get("mfa_pending", False):
+            st.info("Ce compte est protégé par une double authentification.")
+            code_totp = st.text_input(
+                "CODE MFA (6 chiffres)", max_chars=6, placeholder="123456", key="login_totp",
+            )
+
         if st.button("Se connecter →", key="login_submit", use_container_width=True):
-            authenticated = False
+            payload = {"username": identifiant, "password": mot_de_passe}
+            if st.session_state.get("mfa_pending", False) and code_totp:
+                payload["totp_code"] = code_totp.strip()
 
             # Tentative API (backend FastAPI)
             try:
                 res = requests.post(
                     "http://localhost:8000/api/v1/auth/login",
-                    data={"username": identifiant, "password": mot_de_passe},
-                    timeout=2,
+                    data=payload,
+                    timeout=4,
                 )
-                if res.status_code == 200:
-                    data = res.json()
-                    st.session_state.authenticated = True
-                    st.session_state.username = identifiant
-                    st.session_state.role = data.get("role", profil)
-                    st.session_state.token = data.get("access_token", "")
-                    authenticated = True
-            except Exception:
-                pass  # Backend absent → fallback démo
+            except requests.exceptions.RequestException:
+                res = None  # Backend injoignable → mode hors-ligne (comptes démo)
 
-            # Fallback comptes démo
-            if not authenticated:
+            if res is not None and res.status_code == 200:
+                data = res.json()
+                if data.get("mfa_required"):
+                    st.session_state.mfa_pending = True
+                    st.rerun()
+                st.session_state.authenticated = True
+                st.session_state.username = identifiant
+                st.session_state.role = data.get("role", profil)
+                st.session_state.token = data.get("access_token", "")
+                st.session_state.mfa_pending = False
+                st.rerun()
+            elif res is not None:
+                # Refus explicite du back-end (401, 429...) : AUCUN repli sur les comptes démo.
+                try:
+                    detail = res.json().get("detail", "")
+                except ValueError:
+                    detail = ""
+                st.error(detail or "Identifiants incorrects. Vérifiez votre profil, identifiant et mot de passe.")
+            else:
+                # Mode hors-ligne : comptes démo, sans jeton (les pages afficheront « backend indisponible »)
                 account = DEMO_ACCOUNTS.get(identifiant)
                 if account and account["password"] == mot_de_passe:
                     st.session_state.authenticated = True
                     st.session_state.username = identifiant
                     st.session_state.role = account["role"]
-                    authenticated = True
-                elif not authenticated:
+                    st.session_state.token = ""
+                    st.rerun()
+                else:
                     st.error("Identifiants incorrects. Vérifiez votre profil, identifiant et mot de passe.")
-
-            if authenticated:
-                st.rerun()
 
         # ── Séparateur + Pilule "Système Opérationnel" ────────────────────
         st.markdown('<hr class="login-divider">', unsafe_allow_html=True)

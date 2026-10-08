@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 from fastapi import APIRouter, Depends
+from app.api.deps import require_roles, OPS_ROLES, ADMIN_ROLES
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -29,6 +30,8 @@ from app.models.models import (
 from app.services.security_service import security_service
 from app.services.supervision_service import supervision_service
 from app.services.netdevops_service import netdevops_service
+from app.services.inventory_service import inventory_service
+from app.core.scheduler import pin_metric
 
 router = APIRouter()
 
@@ -67,7 +70,7 @@ def _snapshot_health(equipement_id: int, current_score: float) -> None:
 
 # --- Acte 3 : Sécurité -------------------------------------------------------
 
-@router.post("/inject-bruteforce")
+@router.post("/inject-bruteforce", dependencies=[Depends(require_roles(*OPS_ROLES, action="SIMULATION_BRUTEFORCE"))])
 def inject_bruteforce(db: Session = Depends(get_db)):
     """
     Injecte une salve de tentatives SSH infructueuses depuis une IP externe
@@ -109,7 +112,7 @@ def inject_bruteforce(db: Session = Depends(get_db)):
     events_before = {e.id for e in db.query(EvenementSecurite.id).all()}
     alerts_before = {a.id for a in db.query(Alerte.id).all()}
 
-    events = security_service.analyze_log_batch(db, log_lines)
+    events = security_service.analyze_log_batch(db, log_lines, equipement_id=target.id)
 
     # Repérer les nouvelles alertes créées par ce même appel
     new_alerts = db.query(Alerte).filter(~Alerte.id.in_(alerts_before)).all() if alerts_before else \
@@ -120,11 +123,10 @@ def inject_bruteforce(db: Session = Depends(get_db)):
     for al in new_alerts:
         SIMULATION_STATE["alertes_ids"].append(al.id)
 
-    # Pénalité de score de santé sur l'hôte ciblé (sshd), comme un incident réel
-    critical = any(ev.severite == "critique" for ev in events)
-    if critical:
-        target.health_score = max(0.0, target.health_score - 25.0)
-        db.commit()
+    # Le score de santé est recalculé par inventory_service (source unique) : les évènements
+    # liés à l'hôte ciblé (equipement_id) sont pris en compte, la pénalité survit donc au scheduler.
+    inventory_service.calculate_health_score(db, target.id)
+    db.refresh(target)
 
     return {
         "scenario": "Acte 3 - Injection SSH Bruteforce",
@@ -140,12 +142,12 @@ def inject_bruteforce(db: Session = Depends(get_db)):
 
 # --- Acte 2 : Supervision ----------------------------------------------------
 
-@router.post("/stress-disk")
+@router.post("/stress-disk", dependencies=[Depends(require_roles(*OPS_ROLES, action="SIMULATION_STRESS_DISQUE"))])
 def stress_disk(db: Session = Depends(get_db)):
     """
     Simule une montée rapide du taux d'occupation disque (60% -> 88%) sur
-    SRV-APP-01, puis déclenche supervision_service.calculate_ttf tel quel
-    pour faire chuter le TTF sous 24h et générer l'alerte préventive.
+    SRV-APP-01, puis évalue le TTF de cette série via supervision_service
+    pour le faire chuter sous 24h et générer l'alerte préventive.
     """
     target = _get_or_create_equipement(db, "SRV-APP-01", "192.168.20.12", "Serveur")
     _snapshot_health(target.id, target.health_score)
@@ -171,7 +173,12 @@ def stress_disk(db: Session = Depends(get_db)):
     db.commit()
     SIMULATION_STATE["metriques_ids"].extend(inserted_ids)
 
-    ttf_hours = supervision_service.calculate_ttf(db, target.id, "disk_percent")
+    # La télémétrie simulée du scheduler continue à partir de 88 % (cohérence visuelle),
+    # et le TTF est évalué sur la série injectée elle-même (indépendamment du bruit du parc).
+    pin_metric(target.id, "disk_percent", progression[-1])
+    series = [(now - timedelta(minutes=(len(progression) - 1 - i) * 8), v) for i, v in enumerate(progression)]
+
+    ttf_hours = supervision_service.evaluate_series(db, target.id, "disk_percent", series, min_points=5)
 
     # Retrouver la prédiction fraîchement créée pour pouvoir la purger au reset
     last_pred = (
@@ -183,6 +190,15 @@ def stress_disk(db: Session = Depends(get_db)):
     if last_pred:
         SIMULATION_STATE["predictions_ids"].append(last_pred.id)
 
+    # Alertes préventives créées ou mises à jour par cette évaluation
+    suffix = "pour disk_percent sur " + target.nom
+    for al in db.query(Alerte).filter(
+        Alerte.statut == "active", Alerte.message.endswith(suffix, autoescape=True)
+    ).all():
+        if al.id not in SIMULATION_STATE["alertes_ids"]:
+            SIMULATION_STATE["alertes_ids"].append(al.id)
+
+    inventory_service.calculate_health_score(db, target.id)
     db.refresh(target)
 
     return {
@@ -196,7 +212,7 @@ def stress_disk(db: Session = Depends(get_db)):
 
 # --- Acte 4 : NetDevOps -------------------------------------------------------
 
-@router.post("/cis-flaw")
+@router.post("/cis-flaw", dependencies=[Depends(require_roles(*OPS_ROLES, action="SIMULATION_FAILLE_CIS"))])
 def cis_flaw(db: Session = Depends(get_db)):
     """
     Injecte une configuration Cisco IOS non conforme (SNMP communautaire par
@@ -235,12 +251,9 @@ def cis_flaw(db: Session = Depends(get_db)):
     for b in new_backups:
         SIMULATION_STATE["sauvegardes_ids"].append(b.id)
 
-    # Pénalité de santé proportionnelle au nombre de non-conformités élevées
-    nb_elevees = sum(1 for a in audits if a.criticite == "elevee")
-    if nb_elevees:
-        target.health_score = max(0.0, target.health_score - 10.0 * nb_elevees)
-        db.commit()
-        db.refresh(target)
+    # Score recalculé par inventory_service (audits ouverts pris en compte)
+    inventory_service.calculate_health_score(db, target.id)
+    db.refresh(target)
 
     return {
         "scenario": "Acte 4 - Non-conformité CIS Cisco",
@@ -255,7 +268,7 @@ def cis_flaw(db: Session = Depends(get_db)):
 
 # --- Remise à zéro -------------------------------------------------------------
 
-@router.post("/reset")
+@router.post("/reset", dependencies=[Depends(require_roles(*OPS_ROLES, action="SIMULATION_RESET"))])
 def reset_simulation(db: Session = Depends(get_db)):
     """
     Purge uniquement les données injectées par les endpoints de simulation
@@ -309,15 +322,16 @@ def reset_simulation(db: Session = Depends(get_db)):
             .delete(synchronize_session=False)
         )
 
-    # Restauration des scores de santé initiaux
+    db.commit()
+
+    # Les scores de santé sont recalculés depuis l'état réel de la base (et non restaurés depuis
+    # un instantané qui serait périmé : le scheduler recalcule les scores toutes les 60 s).
     restored = []
-    for equipement_id, original_score in SIMULATION_STATE["health_snapshots"].items():
+    for equipement_id in list(SIMULATION_STATE["health_snapshots"].keys()):
         eq = db.query(Equipement).filter(Equipement.id == equipement_id).first()
         if eq:
-            eq.health_score = original_score
-            restored.append({"equipement": eq.nom, "health_score_restaure": original_score})
-
-    db.commit()
+            new_score = inventory_service.calculate_health_score(db, equipement_id)
+            restored.append({"equipement": eq.nom, "health_score_restaure": new_score})
 
     # Réinitialisation de l'état en mémoire
     SIMULATION_STATE["evenements_securite_ids"].clear()

@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
+from app.api.deps import require_roles, OPS_ROLES, ADMIN_ROLES
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.models import Metrique, Prediction
@@ -24,7 +25,7 @@ def get_metrics(
     return query.order_by(Metrique.horodatage.desc()).limit(limit).all()
 
 
-@router.post("/metrics", response_model=MetriqueResponse)
+@router.post("/metrics", response_model=MetriqueResponse, dependencies=[Depends(require_roles(*OPS_ROLES))])
 def add_metric(metric: MetriqueCreate, db: Session = Depends(get_db)):
     m_db = Metrique(**metric.model_dump())
     db.add(m_db)
@@ -38,7 +39,7 @@ def get_predictions(db: Session = Depends(get_db)):
     return db.query(Prediction).order_by(Prediction.date_calcul.desc()).all()
 
 
-@router.post("/calculate-ttf/{equipement_id}")
+@router.post("/calculate-ttf/{equipement_id}", dependencies=[Depends(require_roles(*OPS_ROLES))])
 def calculate_ttf(
     equipement_id: int,
     type_metrique: str = "disk_percent",

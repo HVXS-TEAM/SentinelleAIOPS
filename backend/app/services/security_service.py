@@ -35,7 +35,9 @@ class SecurityService:
             }
         return None
 
-    def analyze_log_batch(self, db: Session, log_lines: List[str]) -> List[EvenementSecurite]:
+    def analyze_log_batch(
+        self, db: Session, log_lines: List[str], equipement_id: Optional[int] = None
+    ) -> List[EvenementSecurite]:
         """
         Extract features from logs, train/predict IsolationForest or fallback model, save anomalies and create alerts.
         """
@@ -80,6 +82,7 @@ class SecurityService:
                 severite = "critique" if score < -0.5 else "warning"
                 ev_db = EvenementSecurite(
                     source_ip=ip,
+                    equipement_id=equipement_id,
                     utilisateur=list(ip_stats[ip]["users"])[0],
                     type_evenement="SSH_BRUTEFORCE" if ip_stats[ip]["count"] >= 5 else "ANOMALY_LOG",
                     score_anomalie=score,

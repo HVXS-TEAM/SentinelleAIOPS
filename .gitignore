@@ -47,3 +47,15 @@ desktop.ini
 *.whl
 *.zip
 test_output.pdf
+
+# Artefacts des étapes de patch (voir Progress_Sentinelle.md — étape 0)
+_patch_etape*/
+_backup_etape*/
+*.bak_*
+backup/
+verif*_out.txt
+verif*_err.txt
+pytest_out.txt
+pytest_err.txt
+backend_uvicorn_*.txt
+

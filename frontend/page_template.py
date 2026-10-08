@@ -11,7 +11,7 @@ _LOGO_PATH = Path(__file__).parent / "static" / "logo.png"
 _DEFAULT_ICON = str(_LOGO_PATH) if _LOGO_PATH.exists() else "🛡️"
 
 
-def _demo_panel() -> None:
+def _demo_panel_impl() -> None:
     """
     Panneau de contrôle démo BTS en 1-clic (cf. Phase_3.md §3.3), affiché
     dans la sidebar sur TOUTES les pages puisque appelé depuis
@@ -68,6 +68,23 @@ def _demo_panel() -> None:
             st.warning("⚠️ Backend indisponible — données non actualisées.", icon="⚠️")
 
 
+def _demo_panel() -> None:
+    """[etape3] Le panneau de démonstration est réservé aux rôles Technicien et Administrateur."""
+    if st.session_state.get("role", "") in ("Administrateur", "Technicien"):
+        _demo_panel_impl()
+    elif not api.api_is_online():
+        st.sidebar.warning("⚠️ Backend indisponible — données non actualisées.", icon="⚠️")
+
+
+def _enforce_session() -> None:
+    """[etape3] Jeton expiré (401 reçu de l'API) : retour à l'écran de connexion."""
+    if st.session_state.get("session_expired", False):
+        for key in ("authenticated", "token", "role", "username", "mfa_pending", "session_expired"):
+            st.session_state.pop(key, None)
+        st.session_state["login_notice"] = "Session expirée : reconnectez-vous."
+        st.switch_page("app.py")
+
+
 def page_bootstrap(
     active: str = "Dashboard",
     page_title: str = "Sentinelle AIOps",
@@ -91,6 +108,7 @@ def page_bootstrap(
         )
     except Exception:
         pass
+    _enforce_session()
     load_theme()
     sidebar_nav(active=active)
     _demo_panel()

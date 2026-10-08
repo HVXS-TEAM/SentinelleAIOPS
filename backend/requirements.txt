@@ -21,3 +21,5 @@ requests
 httpx
 pytest
 pytest-cov
+reportlab>=4.0
+pypdf

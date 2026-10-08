@@ -55,4 +55,4 @@ def generate_totp_secret() -> str:
 def verify_totp(secret: str, code: str) -> bool:
     """Verify TOTP code against secret key."""
     totp = pyotp.TOTP(secret)
-    return totp.verify(code)
+    return totp.verify(code, valid_window=1)   # tolère ±30 s de dérive d'horloge

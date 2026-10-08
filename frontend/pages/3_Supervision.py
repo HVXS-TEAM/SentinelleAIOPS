@@ -1,10 +1,21 @@
 """
-3_Supervision.py — Sentinelle AIOps
-Pixel-perfect ref : Ecrans_Reference/Supervision/code.html + screen.png
-Sources : DESIGN.md (tokens) + code.html (DOM & layout) + screen.png (vérification visuelle)
+3_Supervision.py — Sentinelle AIOps (étape 5.1 : branchement sur le vrai back-end)
+
+Toutes les données proviennent de l'API (api_client) :
+    - la pire prédiction TTF réelle (get_predictions) pilote la carte "Prédiction critique"
+      et la liste "Urgence Maintenance" ;
+    - les seuils affichés (95 % de saturation, fenêtre d'alerte 48h/24h) sont ceux réellement
+      utilisés par supervision_service côté back-end — affichés en lecture seule, non éditables
+      ici (le moteur ne les expose pas encore via l'API) ;
+    - les 4 graphiques de télémétrie (CPU, RAM, Disque, Réseau) sont tracés à partir des vraies
+      métriques de l'équipement sélectionné, avec une projection linéaire (même principe que le
+      calcul de TTF côté serveur) pour la partie pointillée.
 """
 import os, sys
+from datetime import datetime, timedelta
 from pathlib import Path
+
+import numpy as np
 import streamlit as st
 
 _LOGO_PATH = str(Path(__file__).parent.parent / "static" / "logo.png")
@@ -19,6 +30,7 @@ st.set_page_config(
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from page_template import page_bootstrap
 from components import trend_chart
+import api_client as api
 
 # ── Garde d'authentification ─────────────────────────────────────────────────
 if not st.session_state.get("authenticated", False):
@@ -27,171 +39,144 @@ if not st.session_state.get("authenticated", False):
 page_bootstrap(
     active="Supervision",
     page_title="Supervision & Analyses Prédictives",
-    search_placeholder="Search hosts, metrics, logs (Cmd+K)..."
+    search_placeholder="Search hosts, metrics, logs (Cmd+K)...",
 )
+
+# ── Constantes reflétant le moteur de supervision (app/services/supervision_service.py) ──────
+CRITICAL_THRESHOLD = 95.0     # % : niveau de saturation utilisé pour extrapoler le TTF
+ALERT_HORIZON_H = 48.0        # heures : au-delà, la prédiction n'est plus jugée urgente
+CRITICAL_TTF_H = 24.0         # heures : en-dessous, la sévérité est "critique" plutôt que "élevée"
+RECENT_WINDOW = timedelta(minutes=10)   # une prédiction plus ancienne n'est plus considérée active
+
+METRIC_TYPES = ["cpu_percent", "ram_percent", "disk_percent", "bandwidth_mbps"]
+METRIC_LABELS = {"cpu_percent": "CPU Utilization", "ram_percent": "RAM Usage",
+                 "disk_percent": "Disk I/O & Fill", "bandwidth_mbps": "Network Traffic"}
+METRIC_COLORS = {"cpu_percent": "#78d8ba", "ram_percent": "#78d8ba",
+                 "disk_percent": "#78d8ba", "bandwidth_mbps": "#81d0f8"}
+
+
+def _fmt_value(metric: str, value: float) -> str:
+    return f"{value:.1f} Mbps" if metric == "bandwidth_mbps" else f"{value:.1f}%"
+
+
+def _fmt_ttf(hours: float) -> str:
+    if hours < 1:
+        return f"{max(1, round(hours * 60))} min"
+    if hours < 24:
+        return f"{hours:.1f} h"
+    return f"{int(hours // 24)}j {int(hours % 24):02d}h"
+
+
+def _severity(hours: float) -> tuple[str, str]:
+    """(libellé, couleur) — mêmes seuils que la sévérité d'alerte côté back-end, complétés
+    par deux paliers d'affichage (moyenne/faible) pour la liste Urgence Maintenance."""
+    if hours < CRITICAL_TTF_H:
+        return "CRITIQUE", "#ffb4ab"
+    if hours < ALERT_HORIZON_H:
+        return "ÉLEVÉE", "#d37768"
+    if hours < 24 * 7:
+        return "MOYENNE", "#81d0f8"
+    return "FAIBLE", "rgba(120, 216, 186, 0.9)"
+
+
+def _latest_predictions(predictions: list[dict], now: datetime) -> list[dict]:
+    """Une entrée par (équipement, métrique) — la plus récente — filtrée aux prédictions
+    encore fraîches (calculées il y a moins de RECENT_WINDOW), triée par TTF croissant."""
+    latest: dict[tuple, dict] = {}
+    for p in predictions:
+        key = (p["equipement_id"], p["metrique"])
+        if key not in latest or p["date_calcul"] > latest[key]["date_calcul"]:
+            latest[key] = p
+    fresh = []
+    for p in latest.values():
+        try:
+            calc = datetime.fromisoformat(p["date_calcul"])
+        except (KeyError, ValueError):
+            continue
+        if now - calc <= RECENT_WINDOW:
+            fresh.append(p)
+    return sorted(fresh, key=lambda p: p["ttf_estime"])
+
+
+def _series(equipement_id: int, metric: str, limit: int = 60) -> list[float]:
+    rows = api.get_metrics(equipement_id=equipement_id, type_metrique=metric, limit=limit)
+    rows = sorted(rows, key=lambda m: m["horodatage"])   # l'API renvoie du plus récent au plus ancien
+    return [m["valeur"] for m in rows]
+
+
+def _forecast(values: list[float], metric: str, n: int = 5) -> list[float]:
+    """Prolonge la série par régression linéaire (même principe que supervision_service.calculate_ttf)."""
+    if len(values) < 5:
+        return []
+    xs = np.arange(len(values), dtype=float)
+    slope, intercept = np.polyfit(xs, values, 1)
+    upper = 100.0 if metric != "bandwidth_mbps" else 1000.0
+    return [max(0.0, min(upper, slope * (len(values) - 1 + i) + intercept)) for i in range(1, n + 1)]
+
+
+# ── Données ───────────────────────────────────────────────────────────────────
+equipements = api.get_equipements()
+names = {e["id"]: e["nom"] for e in equipements}
+now = datetime.utcnow()
+predictions = _latest_predictions(api.get_predictions(), now)
+worst = predictions[0] if predictions else None
 
 # ── STYLES DÉDIÉS SUPERVISION ────────────────────────────────────────────────
 st.html("""
 <style>
-/* Carte Critique de Prédiction */
-.sup-card-critical {
+.sup-card-critical, .sup-card-nominal {
     background-color: var(--surface-container, #1c211e);
-    border: 1px solid var(--error, #ffb4ab);
-    box-shadow: 0 0 15px rgba(255, 180, 171, 0.15);
-    border-radius: 12px;
-    padding: 24px;
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 230px;
+    border-radius: 12px; padding: 24px; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: space-between; min-height: 230px;
 }
-.sup-glow-bg {
-    position: absolute;
-    top: -40px; right: -40px;
-    width: 160px; height: 160px;
-    background: rgba(255, 180, 171, 0.18);
-    border-radius: 50%;
-    filter: blur(40px);
-    pointer-events: none;
-}
-.btn-intervention {
-    background-color: var(--error, #ffb4ab);
-    color: var(--on-error, #690005);
-    padding: 8px 18px;
-    border-radius: 8px;
-    border: none;
-    font-family: var(--font-body, 'Inter', sans-serif);
-    font-size: 13px;
-    font-weight: 700;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: background-color 0.15s ease;
-}
-.btn-intervention:hover {
-    background-color: #ffdad6;
-}
-
-/* Carte Configuration Alertes */
-.sup-card-config {
-    background-color: var(--surface-container, #1c211e);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 230px;
-}
-.config-header {
-    font-family: var(--font-headline, 'Inter', sans-serif);
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--on-surface, #dfe4e0);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: 16px;
-}
-
-/* Carte Projections Télémétriques */
-.sup-card-projections {
-    background-color: var(--surface-container, #1c211e);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 20px;
-}
-.chart-box {
-    background-color: var(--surface-container-low, #181d1b);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-}
-.chart-box-critical {
-    background-color: var(--surface-container-low, #181d1b);
-    border: 1px solid rgba(255, 180, 171, 0.4);
-    box-shadow: inset 0 0 20px rgba(255, 180, 171, 0.05);
-    border-radius: 8px;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Carte Colonne Droite : Urgence Maintenance */
-.sup-card-urgency {
-    background-color: var(--surface-container, #1c211e);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-}
-.urgency-header {
-    font-family: var(--font-headline, 'Inter', sans-serif);
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--on-surface, #dfe4e0);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: 14px;
-}
-.urgency-item {
-    background-color: var(--surface-container-high, #262b29);
-    border-radius: 0 8px 8px 0;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: background-color 0.15s ease;
-}
-.urgency-item:hover {
-    background-color: var(--surface-container-highest);
-}
+.sup-card-critical { border: 1px solid var(--error, #ffb4ab); box-shadow: 0 0 15px rgba(255, 180, 171, 0.15); }
+.sup-card-nominal { border: 1px solid var(--primary, #78d8ba); box-shadow: 0 0 15px rgba(120, 216, 186, 0.12); }
+.sup-glow-bg { position: absolute; top: -40px; right: -40px; width: 160px; height: 160px; border-radius: 50%; filter: blur(40px); pointer-events: none; }
+.sup-glow-critical { background: rgba(255, 180, 171, 0.18); }
+.sup-glow-nominal { background: rgba(120, 216, 186, 0.16); }
+.sup-card-config { background-color: var(--surface-container, #1c211e); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; min-height: 230px; }
+.config-header, .urgency-header { font-family: var(--font-headline, 'Inter', sans-serif); font-size: 15px; font-weight: 600; color: var(--on-surface, #dfe4e0); display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
+.sup-card-projections { background-color: var(--surface-container, #1c211e); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; }
+.chart-box, .chart-box-critical { background-color: var(--surface-container-low, #181d1b); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; }
+.chart-box { border: 1px solid rgba(255,255,255,0.08); }
+.chart-box-critical { border: 1px solid rgba(255, 180, 171, 0.4); box-shadow: inset 0 0 20px rgba(255, 180, 171, 0.05); }
+.sup-card-urgency { background-color: var(--surface-container, #1c211e); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; height: 100%; }
+.urgency-item { background-color: var(--surface-container-high, #262b29); border-radius: 0 8px 8px 0; padding: 12px 14px; margin-bottom: 10px; }
+.threshold-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 6px; }
+.threshold-bar { position: relative; width: 100%; height: 4px; background: var(--surface-container-highest); border-radius: 2px; margin-bottom: 14px; }
+.threshold-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 2px; }
 </style>
 """)
 
 # ── EN-TÊTE DE PAGE ──────────────────────────────────────────────────────────
-st.html(
-    """
-    <div style="margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
-            <span style="cursor: pointer;">Home</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            <span style="color: var(--on-surface, #dfe4e0); font-weight: 600;">Supervision</span>
-        </div>
-        <div style="font-family: var(--font-headline, 'Inter'); font-size: 28px; font-weight: 700; color: var(--on-surface, #dfe4e0); line-height: 1.2;">
-            Supervision &amp; Analyses Prédictives
-        </div>
-        <div style="font-family: var(--font-body, 'Inter'); font-size: 14px; color: var(--on-surface-variant, #bdc9c3); margin-top: 4px;">
-            Analyse de santé et prédiction de pannes en temps réel des équipements critiques.
-        </div>
+st.html("""
+<div style="margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
+        <span>Home</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        <span style="color: var(--on-surface, #dfe4e0); font-weight: 600;">Supervision</span>
     </div>
-    """
-)
+    <div style="font-family: var(--font-headline, 'Inter'); font-size: 28px; font-weight: 700; color: var(--on-surface, #dfe4e0); line-height: 1.2;">
+        Supervision &amp; Analyses Prédictives
+    </div>
+    <div style="font-family: var(--font-body, 'Inter'); font-size: 14px; color: var(--on-surface-variant, #bdc9c3); margin-top: 4px;">
+        Analyse de santé et prédiction de pannes en temps réel des équipements critiques.
+    </div>
+</div>
+""")
 
-# ── DISPOSITION EN 2 GRANDES COLONNES (9/12 et 3/12) ─────────────────────────
 col_main, col_side = st.columns([2.8, 1.0])
 
 with col_main:
-    # ── LIGNE SUPÉRIEURE : HERO PREDICTION (2/3) + CONFIG ALERTES (1/3) ───────
     c_hero, c_conf = st.columns([1.8, 1.0])
-    
+
     with c_hero:
-        st.html(
-            """
+        if worst is not None:
+            eq_nom = names.get(worst["equipement_id"], f"#{worst['equipement_id']}")
+            metric_lbl = METRIC_LABELS.get(worst["metrique"], worst["metrique"])
+            st.html(f"""
             <div class="sup-card-critical">
-                <div class="sup-glow-bg"></div>
+                <div class="sup-glow-bg sup-glow-critical"></div>
                 <div style="position: relative; z-index: 10;">
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="#ffb4ab" stroke="#ffb4ab" stroke-width="1">
@@ -204,278 +189,172 @@ with col_main:
                         </span>
                     </div>
                     <div style="font-family: var(--font-headline); font-size: 20px; font-weight: 700; color: var(--on-surface, #dfe4e0); margin-bottom: 4px;">
-                        FW-EXT-02 : Saturation disque estimée
+                        {eq_nom} : saturation {metric_lbl.lower()} estimée
                     </div>
                     <div style="font-family: var(--font-body); font-size: 13px; color: var(--on-surface-variant, #bdc9c3); line-height: 1.4;">
-                        Le taux d'écriture des logs indique un remplissage à 100% imminent. Action requise.
+                        La tendance de télémétrie indique un remplissage à {CRITICAL_THRESHOLD:.0f}% imminent. Action requise.
                     </div>
                 </div>
-
-                <div style="position: relative; z-index: 10; border-top: 1px solid rgba(255, 180, 171, 0.2); padding-top: 14px; margin-top: 16px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px;">
-                    <div>
-                        <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 2px;">
-                            Time-To-Failure Estimé
-                        </div>
-                        <div style="font-family: var(--font-mono, 'IBM Plex Sans'); font-size: 28px; font-weight: 700; color: var(--error, #ffb4ab); line-height: 1.1;">
-                            4 <span style="font-size: 18px; font-weight: 500; opacity: 0.85;">jours</span> 06 <span style="font-size: 18px; font-weight: 500; opacity: 0.85;">heures</span>
-                        </div>
+                <div style="position: relative; z-index: 10; border-top: 1px solid rgba(255, 180, 171, 0.2); padding-top: 14px; margin-top: 16px;">
+                    <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 2px;">
+                        Time-To-Failure Estimé
                     </div>
-                    <button class="btn-intervention">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                        </svg>
-                        Planifier Intervention
-                    </button>
+                    <div style="font-family: var(--font-mono, 'IBM Plex Sans'); font-size: 28px; font-weight: 700; color: var(--error, #ffb4ab); line-height: 1.1;">
+                        {_fmt_ttf(worst["ttf_estime"])}
+                    </div>
                 </div>
             </div>
-            """
-        )
+            """)
+        else:
+            st.html("""
+            <div class="sup-card-nominal">
+                <div class="sup-glow-bg sup-glow-nominal"></div>
+                <div style="position: relative; z-index: 10;">
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 6px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#78d8ba" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+                        <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--primary, #78d8ba); letter-spacing: 0.08em; text-transform: uppercase;">
+                            SITUATION NOMINALE
+                        </span>
+                    </div>
+                    <div style="font-family: var(--font-headline); font-size: 20px; font-weight: 700; color: var(--on-surface, #dfe4e0); margin-bottom: 4px;">
+                        Aucune saturation critique prévue
+                    </div>
+                    <div style="font-family: var(--font-body); font-size: 13px; color: var(--on-surface-variant, #bdc9c3); line-height: 1.4;">
+                        La tendance de télémétrie est stable sur l'ensemble du parc supervisé (horizon 48h).
+                    </div>
+                </div>
+            </div>
+            """)
 
     with c_conf:
-        st.html(
-            """
-            <div class="sup-card-config">
-                <div class="config-header">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-                        <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-                        <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-                        <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
-                    </svg>
-                    Configuration Alertes
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 16px; justify-content: center; flex: 1;">
-                    <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 6px;">
-                            <span style="color: var(--on-surface-variant, #bdc9c3);">Seuil d'Avertissement</span>
-                            <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d37768; background: rgba(211, 119, 104, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(211, 119, 104, 0.3);">80%</span>
-                        </div>
-                        <div style="position: relative; width: 100%; height: 4px; background: var(--surface-container-highest); border-radius: 2px;">
-                            <div style="position: absolute; left: 0; top: 0; height: 100%; width: 80%; background: #d37768; border-radius: 2px;"></div>
-                            <div style="position: absolute; top: 50%; left: 80%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #d37768; border: 2px solid var(--surface-container); cursor: pointer;"></div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 6px;">
-                            <span style="color: var(--on-surface-variant, #bdc9c3);">Seuil Critique</span>
-                            <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #ffb4ab; background: rgba(255, 180, 171, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 180, 171, 0.3);">95%</span>
-                        </div>
-                        <div style="position: relative; width: 100%; height: 4px; background: var(--surface-container-highest); border-radius: 2px;">
-                            <div style="position: absolute; left: 0; top: 0; height: 100%; width: 95%; background: #ffb4ab; border-radius: 2px;"></div>
-                            <div style="position: absolute; top: 50%; left: 95%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #ffb4ab; border: 2px solid var(--surface-container); cursor: pointer;"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div style="text-align: right; padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 10px;">
-                    <a style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--primary, #78d8ba); cursor: pointer; text-decoration: none;">
-                        Enregistrer
-                    </a>
-                </div>
+        st.html(f"""
+        <div class="sup-card-config">
+            <div class="config-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                    <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                    <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+                </svg>
+                Configuration Alertes
             </div>
-            """
-        )
+            <div>
+                <div class="threshold-row">
+                    <span style="color: var(--on-surface-variant, #bdc9c3);">Seuil de saturation</span>
+                    <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #ffb4ab; background: rgba(255,180,171,0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,180,171,0.3);">{CRITICAL_THRESHOLD:.0f}%</span>
+                </div>
+                <div class="threshold-bar"><div class="threshold-fill" style="width: {CRITICAL_THRESHOLD:.0f}%; background: #ffb4ab;"></div></div>
+                <div class="threshold-row">
+                    <span style="color: var(--on-surface-variant, #bdc9c3);">Fenêtre d'alerte préventive</span>
+                    <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d37768; background: rgba(211,119,104,0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(211,119,104,0.3);">{ALERT_HORIZON_H:.0f}h</span>
+                </div>
+                <div style="font-size: 11px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 4px;">Sévérité CRITIQUE si TTF &lt; {CRITICAL_TTF_H:.0f}h</div>
+            </div>
+            <div style="text-align: right; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 10px;">
+                <span style="font-family: var(--font-body); font-size: 11px; color: var(--on-surface-variant, #bdc9c3);">
+                    Valeurs du moteur de supervision (lecture seule)
+                </span>
+            </div>
+        </div>
+        """)
 
     st.html("<div style='height: 16px;'></div>")
 
-    # ── LIGNE INFÉRIEURE : PROJECTIONS DES TÉLÉMÉTRIES (GRILLE 2x2) ───────────
-    st.html(
-        """
-        <div class="sup-card-projections">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
-                <div style="font-family: var(--font-headline); font-size: 16px; font-weight: 600; color: var(--on-surface, #dfe4e0);">
-                    Projections des Télémétries Systèmes
+    st.html("""
+    <div class="sup-card-projections">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+            <div style="font-family: var(--font-headline); font-size: 16px; font-weight: 600; color: var(--on-surface, #dfe4e0);">
+                Projections des Télémétries Systèmes
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; font-size: 12px;">
+                <div style="display: flex; align-items: center; gap: 6px; color: var(--on-surface-variant, #bdc9c3);">
+                    <span style="width: 14px; height: 2px; background: var(--primary, #78d8ba); border-radius: 1px;"></span> Historique
                 </div>
-                <div style="display: flex; align-items: center; gap: 16px; font-size: 12px;">
-                    <div style="display: flex; align-items: center; gap: 6px; color: var(--on-surface-variant, #bdc9c3);">
-                        <span style="width: 14px; height: 2px; background: var(--primary, #78d8ba); border-radius: 1px;"></span>
-                        Historique
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 6px; color: var(--on-surface-variant, #bdc9c3);">
-                        <span style="width: 14px; height: 0px; border-top: 2px dashed #d37768;"></span>
-                        Zone de prédiction (+48h)
-                    </div>
-                    <select style="background: var(--surface-container-high); border: 1px solid var(--outline); color: var(--on-surface); font-size: 12px; border-radius: 4px; padding: 4px 8px; outline: none;">
-                        <option>FW-EXT-02</option>
-                        <option>Cluster Core (All)</option>
-                    </select>
+                <div style="display: flex; align-items: center; gap: 6px; color: var(--on-surface-variant, #bdc9c3);">
+                    <span style="width: 14px; height: 0px; border-top: 2px dashed #d37768;"></span> Zone de prédiction
                 </div>
             </div>
-        """
-    )
+        </div>
+    """)
 
-    row1_c1, row1_c2 = st.columns(2)
-    with row1_c1:
-        with st.container():
-            st.html(
-                """
-                <div class="chart-box">
+    if equipements:
+        options = [e["id"] for e in equipements]
+        default_id = worst["equipement_id"] if worst else options[0]
+        sel_id = st.selectbox(
+            "Équipement", options=options, index=options.index(default_id),
+            format_func=lambda i: names.get(i, f"#{i}"), key="sup_selected_eq", label_visibility="collapsed",
+        )
+
+        rows = [(0, 0), (0, 1), (1, 0), (1, 1)]
+        grid_cols = [st.columns(2), None]
+        grid_cols[0:1] = [st.columns(2), st.columns(2)]
+        for (r, c), metric in zip([(0, 0), (0, 1), (1, 0), (1, 1)], METRIC_TYPES):
+            container = grid_cols[r][c]
+            with container:
+                values = _series(sel_id, metric)
+                forecast = _forecast(values, metric)
+                current = _fmt_value(metric, values[-1]) if values else "—"
+                is_critical = metric == "disk_percent" and values and values[-1] >= 90
+                box_class = "chart-box-critical" if is_critical else "chart-box"
+                color = "#ffb4ab" if is_critical else METRIC_COLORS[metric]
+                st.html(f"""
+                <div class="{box_class}">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--on-surface, #dfe4e0);">CPU Utilization</span>
-                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--primary, #78d8ba);">62.4%</span>
+                        <span style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--on-surface, #dfe4e0);">{METRIC_LABELS[metric]}</span>
+                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: {color};">{current}</span>
                     </div>
-                """
-            )
-            trend_chart(
-                history=[50, 52, 48, 55, 60, 58, 62.4],
-                forecast=[64, 66, 68, 70, 72],
-                color="#78d8ba",
-                view_w=350,
-                view_h=110,
-            )
-            st.html("</div>")
-
-    with row1_c2:
-        with st.container():
-            st.html(
-                """
-                <div class="chart-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--on-surface, #dfe4e0);">RAM Usage</span>
-                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: #d37768;">88.1%</span>
-                    </div>
-                """
-            )
-            trend_chart(
-                history=[40, 45, 55, 65, 75, 82, 88.1],
-                forecast=[90, 92, 94, 96, 97],
-                color="#78d8ba",
-                view_w=350,
-                view_h=110,
-            )
-            st.html("</div>")
-
-    st.html("<div style='height: 10px;'></div>")
-
-    row2_c1, row2_c2 = st.columns(2)
-    with row2_c1:
-        with st.container():
-            st.html(
-                """
-                <div class="chart-box-critical">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--error, #ffb4ab); display: flex; align-items: center; gap: 6px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                                <line x1="12" y1="9" x2="12" y2="13"/>
-                                <line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
-                            Disk I/O &amp; Fill
-                        </span>
-                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--error, #ffb4ab);">96.8%</span>
-                    </div>
-                """
-            )
-            trend_chart(
-                history=[50, 58, 66, 75, 84, 90, 96.8],
-                forecast=[97.5, 98.5, 99.2, 100],
-                color="#78d8ba",
-                threshold=100,
-                threshold_label="100% Saturation",
-                view_w=350,
-                view_h=110,
-            )
-            st.html("</div>")
-
-    with row2_c2:
-        with st.container():
-            st.html(
-                """
-                <div class="chart-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                        <span style="font-family: var(--font-body); font-size: 13px; font-weight: 600; color: var(--on-surface, #dfe4e0);">Network Traffic</span>
-                        <span style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--primary, #78d8ba);">1.2 Gbps</span>
-                    </div>
-                """
-            )
-            trend_chart(
-                history=[20, 80, 30, 95, 40, 70, 60],
-                forecast=[55, 50, 48, 45],
-                color="#81d0f8",
-                view_w=350,
-                view_h=110,
-            )
-            st.html("</div>")
+                """)
+                if values:
+                    hist = values[-15:]
+                    kwargs = {}
+                    if metric == "disk_percent":
+                        kwargs = {"threshold": 100, "threshold_label": "100% Saturation"}
+                    trend_chart(history=hist, forecast=forecast, color=METRIC_COLORS[metric], view_w=350, view_h=110, **kwargs)
+                else:
+                    st.caption("Pas encore assez de télémétrie collectée — réessayez dans quelques secondes.")
+                st.html("</div>")
+            if r == 1 and c == 1:
+                pass
+    else:
+        st.info("Aucun équipement enregistré dans l'inventaire.")
 
     st.html("</div>")
 
 with col_side:
-    # ── COLONNE DROITE : URGENCE MAINTENANCE ───────────────────────────────────
-    st.html(
-        """
-        <div class="sup-card-urgency">
-            <div class="urgency-header">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffb4ab" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                Urgence Maintenance
+    items_html = "".join(
+        f"""
+        <div class="urgency-item" style="border-left: 4px solid {_severity(p['ttf_estime'])[1]};">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
+                <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #dfe4e0;">{names.get(p['equipement_id'], f"#{p['equipement_id']}")}</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: {_severity(p['ttf_estime'])[1]}; background: rgba(0,0,0,0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid {_severity(p['ttf_estime'])[1]}; letter-spacing: 0.05em;">{_severity(p['ttf_estime'])[0]}</span>
             </div>
-
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <!-- 1. FW-EXT-02 (CRITIQUE) -->
-                <div class="urgency-item" style="border-left: 4px solid #ffb4ab;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
-                        <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #dfe4e0;">FW-EXT-02</span>
-                        <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #ffb4ab; background: rgba(255, 180, 171, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255, 180, 171, 0.3); letter-spacing: 0.05em;">CRITIQUE</span>
-                    </div>
-                    <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
-                        Saturation disque estimée
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: #ffb4ab;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>4j 06h</span>
-                    </div>
-                </div>
-
-                <!-- 2. CORE-RTR-01 (ÉLEVÉE) -->
-                <div class="urgency-item" style="border-left: 4px solid #d37768;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
-                        <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #dfe4e0;">CORE-RTR-01</span>
-                        <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #d37768; background: rgba(211, 119, 104, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(211, 119, 104, 0.3); letter-spacing: 0.05em;">ÉLEVÉE</span>
-                    </div>
-                    <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
-                        Memory Leak (Pool A)
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: #d37768;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>12j 14h</span>
-                    </div>
-                </div>
-
-                <!-- 3. SRV-APP-14 (MOYENNE) -->
-                <div class="urgency-item" style="border-left: 4px solid #81d0f8;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
-                        <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #dfe4e0;">SRV-APP-14</span>
-                        <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #81d0f8; background: rgba(129, 208, 248, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(129, 208, 248, 0.3); letter-spacing: 0.05em;">MOYENNE</span>
-                    </div>
-                    <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
-                        Usure ventilateur CPU 2
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: #81d0f8;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>24j 00h</span>
-                    </div>
-                </div>
-
-                <!-- 4. SW-ACC-4B (FAIBLE) -->
-                <div class="urgency-item" style="border-left: 4px solid rgba(120, 216, 186, 0.5); opacity: 0.85;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
-                        <span style="font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: #dfe4e0;">SW-ACC-4B</span>
-                        <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #78d8ba; background: rgba(120, 216, 186, 0.15); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(120, 216, 186, 0.3); letter-spacing: 0.05em;">FAIBLE</span>
-                    </div>
-                    <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
-                        Anomalie mineure I/O
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: rgba(120, 216, 186, 0.9);">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                        <span>&gt; 60j</span>
-                    </div>
-                </div>
+            <div style="font-family: var(--font-body); font-size: 12px; color: var(--on-surface-variant, #bdc9c3); margin-bottom: 6px;">
+                Saturation {METRIC_LABELS.get(p['metrique'], p['metrique']).lower()} prévue
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 12px; color: {_severity(p['ttf_estime'])[1]};">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <span>{_fmt_ttf(p['ttf_estime'])}</span>
             </div>
         </div>
         """
+        for p in predictions[:6]
     )
+    if not items_html:
+        items_html = """
+        <div style="text-align: center; padding: 24px 8px; color: var(--on-surface-variant, #bdc9c3); font-size: 13px;">
+            ✅ Aucune maintenance urgente prévue.
+        </div>
+        """
+    st.html(f"""
+    <div class="sup-card-urgency">
+        <div class="urgency-header">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffb4ab" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Urgence Maintenance
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            {items_html}
+        </div>
+    </div>
+    """)

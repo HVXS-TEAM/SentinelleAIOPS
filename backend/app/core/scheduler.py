@@ -17,12 +17,13 @@ Le scheduler est démarré/arrêté via le `lifespan` de FastAPI dans main.py.
 
 import logging
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 import psutil
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from app.core.database import SessionLocal
+from app.core.maintenance import purge_old_data
 from app.models.models import Equipement, Metrique
 
 logger = logging.getLogger("sentinelle.scheduler")
@@ -30,10 +31,10 @@ logger = logging.getLogger("sentinelle.scheduler")
 # Types de métriques simulées suivies par équipement
 METRIC_TYPES = ["cpu_percent", "ram_percent", "disk_percent", "bandwidth_mbps"]
 
-# Etat interne en mémoire du "dernier point" simulé par (equipement_id, type_metrique).
-# Sert de base pour appliquer des micro-variations réalistes plutôt que
-# de tirer des valeurs totalement aléatoires à chaque tick.
+# Etat interne en mémoire du "dernier point" simulé par (equipement_id, type_metrique)
+# et de la valeur "de repos" autour de laquelle la métrique oscille.
 _last_values: dict[tuple[int, str], float] = {}
+_baselines: dict[tuple[int, str], float] = {}
 
 # Nom d'hôte considéré comme "la machine locale" : si un équipement de la base
 # porte ce nom, ses métriques cpu/ram/disk seront les vraies valeurs psutil
@@ -48,19 +49,30 @@ DEFAULT_BASELINES = {
     "bandwidth_mbps": (5.0, 80.0),
 }
 
+# Bruit par tick (écart-type) : le disque bouge très lentement, le réseau beaucoup.
+NOISE_SIGMA = {
+    "cpu_percent": 2.0,
+    "ram_percent": 0.6,
+    "disk_percent": 0.15,
+    "bandwidth_mbps": 8.0,
+}
+REVERSION = 0.05  # force de rappel vers la valeur de repos (évite la dérive vers 100 %)
+
+
+def pin_metric(equipement_id: int, type_metrique: str, value: float) -> None:
+    """Force la prochaine valeur simulée (utilisé par la démo pour rester cohérent après une injection)."""
+    _last_values[(equipement_id, type_metrique)] = float(value)
+
 
 def _next_simulated_value(equipement_id: int, type_metrique: str) -> float:
-    """Applique une micro-variation réaliste (marche aléatoire bornée) à la dernière valeur connue."""
+    """Marche aléatoire bornée avec retour à la moyenne (processus d'Ornstein-Uhlenbeck discret)."""
     key = (equipement_id, type_metrique)
-    if key not in _last_values:
-        low, high = DEFAULT_BASELINES.get(type_metrique, (10.0, 50.0))
-        _last_values[key] = random.uniform(low, high)
+    low, high = DEFAULT_BASELINES.get(type_metrique, (10.0, 50.0))
+    base = _baselines.setdefault(key, random.uniform(low, high))
+    current = _last_values.setdefault(key, base)
 
-    current = _last_values[key]
-    # Amplitude de variation : petite dérive +/- avec une légère tendance
-    # occasionnelle à la hausse pour permettre au TTF de se déclencher.
-    drift = random.uniform(-1.5, 2.0)
-    new_value = current + drift
+    sigma = NOISE_SIGMA.get(type_metrique, 1.0)
+    new_value = current + REVERSION * (base - current) + random.gauss(0.0, sigma)
 
     # Bornes physiques
     if type_metrique == "bandwidth_mbps":
@@ -148,6 +160,16 @@ def recompute_health() -> None:
         db.close()
 
 
+def _run_purge() -> None:
+    """Job (10 min) : rétention des métriques, prédictions et alertes résolues."""
+    try:
+        counts = purge_old_data()
+        if any(counts.values()):
+            logger.info("Purge de rétention : %s", counts)
+    except Exception:
+        logger.exception("Erreur lors de la purge de rétention.")
+
+
 scheduler = BackgroundScheduler(timezone="UTC")
 
 
@@ -170,8 +192,15 @@ def start_scheduler() -> None:
         id="recompute_health", replace_existing=True, max_instances=1
     )
 
+    # Rétention : une première purge au démarrage, puis toutes les 10 minutes
+    scheduler.add_job(
+        _run_purge, "interval", minutes=10,
+        id="purge_old_data", replace_existing=True, max_instances=1,
+        next_run_time=datetime.now(timezone.utc)
+    )
+
     scheduler.start()
-    logger.info("Scheduler Sentinelle AIOps démarré (télémétrie=10s, TTF=30s, santé=60s).")
+    logger.info("Scheduler Sentinelle AIOps démarré (télémétrie=10s, TTF=30s, santé=60s, purge=10min).")
 
 
 def stop_scheduler() -> None:

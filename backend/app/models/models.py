@@ -54,6 +54,7 @@ class EvenementSecurite(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     source_ip = Column(String(45), nullable=False, index=True)
+    equipement_id = Column(Integer, ForeignKey("equipements.id"), nullable=True, index=True)  # hôte ciblé
     utilisateur = Column(String(100), nullable=True)
     type_evenement = Column(String(100), nullable=False)  # SSH_BRUTEFORCE, PORT_SCAN, AUTH_FAILURE
     score_anomalie = Column(Float, nullable=False)  # Output d'IsolationForest

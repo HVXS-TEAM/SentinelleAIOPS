@@ -1,5 +1,6 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
+from app.api.deps import require_roles, OPS_ROLES, ADMIN_ROLES
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.models import Equipement
@@ -22,7 +23,7 @@ def get_equipement(equipement_id: int, db: Session = Depends(get_db)):
     return eq
 
 
-@router.post("/equipements", response_model=EquipementResponse)
+@router.post("/equipements", response_model=EquipementResponse, dependencies=[Depends(require_roles(*OPS_ROLES, action="EQUIPEMENT_CREE"))])
 def create_equipement(eq: EquipementCreate, db: Session = Depends(get_db)):
     eq_db = Equipement(**eq.model_dump())
     db.add(eq_db)
@@ -31,7 +32,7 @@ def create_equipement(eq: EquipementCreate, db: Session = Depends(get_db)):
     return eq_db
 
 
-@router.post("/recalculate-health/{equipement_id}")
+@router.post("/recalculate-health/{equipement_id}", dependencies=[Depends(require_roles(*OPS_ROLES))])
 def recalculate_health(equipement_id: int, db: Session = Depends(get_db)):
     score = inventory_service.calculate_health_score(db, equipement_id)
     return {"equipement_id": equipement_id, "health_score": score}
