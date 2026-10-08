@@ -103,25 +103,40 @@ Forest réel. `check_env.ps1` le signale à chaque préflight.
 ### Étape 2 — Modernisation du front Streamlit (D1)
 > Objectif : base technique à jour, zéro dépendance abandonnée.
 
-- [ ] Passer `streamlit` 1.61.1 → **1.65.0** (`frontend/requirements.txt` + venv) ;
-      tester le démarrage de l'app et la page de connexion.
-- [ ] **Supprimer `streamlit-autorefresh`** et remplacer tous les `st_autorefresh(interval=5000, ...)`
-      par des fragments natifs : `@st.fragment(run_every=5)` autour des zones de données à
-      rafraîchir ; conserver le bouton pause (figer l'écran pendant la soutenance) en basculant
-      `run_every` à `None`.
-      → Cartographie à faire dans : `1_Dashboard.py`, `2_Sécurité.py`, `3_Supervision.py`,
-      `4_NetDevOps.py`, `5_Parc_Informatique.py`, `6_Reporting_&_Admin.py`, `7_Assistant_IA.py`,
-      `page_template.py`, `components.py`.
-- [ ] Remplacer les `datetime.utcnow()` dépréciés par `datetime.now(timezone.utc)`
-      côté front **et** back (`admin.py`, `reporting_service.py`, `3_Supervision.py`, etc.).
-- [ ] Corriger les warnings d'exécution apparus lors des vérifs (ignorer les
-      `ScriptRunContext` bénins, traiter les autres).
+- [x] Passer `streamlit` 1.61.1 → **1.65.0** (`frontend/requirements.txt` + venv via
+      wheel offline `streamlit-1.65.0-py3-none-any.whl`, wheel supprimé après install) ;
+      démarrage de l'app + page de connexion OK (8000 UP + 8501 UP via `start_all`).
+- [x] **Supprimer `streamlit-autorefresh`** (abandonné, juin 2023, `requirements.txt` nettoyé)
+      et le remplacer par un **fragment natif** `@st.fragment(run_every=5)` dans
+      `page_template.py` (`_auto_refresh_tick()`) : équivalent fidèle du full rerun 5 s
+      (pattern officiel `st.rerun()` depuis un fragment), **garde anti-boucle**
+      `time.monotonic()` (le corps d'un fragment s'exécute aussi à chaque run complet),
+      bouton pause soutenance conservé (fragment non rendu → timer annulé), fragment
+      désarmé sous AppTest (`streamlit.testing` détecté + `demo_autorefresh_paused=True`
+      dans les scripts `verif_*`) pour laisser les vérifs se terminer.
+      → Cartographie : `st_autorefresh` n'était utilisé **que** dans `page_template.py`
+      (socle commun des 7 pages) — aucune des 7 pages n'avait de modernisation à subir.
+- [x] Remplacer les `datetime.utcnow()` dépréciés par le helper **`utcnow_naive()`**
+      (`backend/app/core/time_utils.py`) : **17 sites back** (services, endpoints,
+      maintenance, scheduler, security, tous les `default=` des modèles, tests,
+      `verif_etape2.py`, `init_db.py`) + **3 sites front** (`1_Dashboard.py`,
+      `2_Sécurité.py`, `3_Supervision.py`). Naïf conservé volontairement (colonnes
+      SQLite sans fuseau, comparaisons naïf/naïf partout — passer en aware casserait
+      les soustractions) ; imports `datetime` morts nettoyés.
+- [x] Traiter les warnings : migration **`use_container_width` → `width`**
+      (`True`→`"stretch"`, `False`→`"content"`, 5 sites : `app.py`, `components.py` ×2,
+      `page_template.py` ×2, `1_Dashboard.py` ×2) car Streamlit 1.65 émet un
+      DeprecationWarning (suppression annoncée après le 31/12/2025) ; `ScriptRunContext`
+      bénins ignorés comme prévu.
 - [ ] Mettre à jour les dépendances front mineures (`plotly`, `pandas`…) si compatible ;
-      ne pas toucher à `python-telegram-bot` sans besoin.
+      ne pas toucher à `python-telegram-bot` sans besoin. (**Reporté** : réseau PyPI
+      instable — `scikit-learn` reste à installer, `check_env` le signale en `[ATTN]`.)
 
-**Validation :** `python frontend/verif_etape5_supervision.py` → **TOUT EST OK** (backend lancé) ;
-rejeu de `verif_etape3_front.py` ; démarrage manuel des 7 pages sans exception ni warning
-bloquant ; `pip show streamlit` → 1.65.0 ; plus aucune import `streamlit_autorefresh`.
+**Validation :** ✅ `verif_etape5_supervision.py` → **TOUT EST OK** (13/13, backend lancé,
+Streamlit 1.65.0) ; ✅ `pytest -q` → 39 passed ; ✅ `check_env` exit 0 avec contrôle
+`streamlit >= 1.65` ; ✅ `pip show streamlit` → 1.65.0 ;
+✅ zéro référence `streamlit_autorefresh` / `st_autorefresh` / `use_container_width` /
+`utcnow()` dans le code projet. Commit `5277f3d` (26 fichiers).
 
 ---
 
@@ -192,4 +207,5 @@ en l'état).
 | 08/10/2026 | Création du document. Décisions D1 (Streamlit modernisé), D2 (natif sans Docker), D3 (commit + nettoyage) arrêtées. Validation des étapes 1→5 confirmée (39 tests OK, verif_etape5 TOUT EST OK). |
 | 08/10/2026 | **Étape 0 terminée** : commits `3369df9` (état validé, 45 fichiers) + `7269b8f` (suppression artefacts), backup base `backup/sentinelle_aiops_20261008_1715.db`, `.gitignore` enrichi, pytest 39 passed après nettoyage. |
 | 08/10/2026 | **Étape 1 terminée** : scripts natifs `check_env/start_backend/start_frontend/start_all` (.ps1) + 3 wrappers `.bat`, README réécrit (mode natif, Docker secondaire), tests positif/négatif OK, `start_all` validé de bout en bout (8000+8501 UP). Point ouvert : installation `scikit-learn` à refaire (réseau PyPI instable). |
+| 08/10/2026 | **Étape 2 terminée** : Streamlit 1.65.0 (wheel offline), `streamlit-autorefresh` supprimé → fragment natif `@st.fragment(run_every=5)` avec garde anti-boucle + pause soutenance + désarmement AppTest, `utcnow()` → helper `utcnow_naive()` (17 sites back + 3 front), `use_container_width` → `width`. Validations : verif_etape5 TOUT EST OK (13/13), pytest 39 passed, check_env exit 0. Commit `5277f3d` (26 fichiers). Reste reporté : dépendances mineures + `scikit-learn` (réseau PyPI instable). |
 
