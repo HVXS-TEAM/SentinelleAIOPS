@@ -114,7 +114,7 @@ Pour une ergonomie optimale lors de la présentation orale :
 | **Phase 1 : Moteur Autonome** | `scheduler.py` (télémétrie 10s, TTF 30s, santé 60s) + `lifespan` | ✅ **TERMINÉ** |
 | **Phase 2 : Simulation Démo** | `simulation.py` (4 endpoints) + `router.py` + tests unitaires (PASS) | ✅ **TERMINÉ** |
 | **Phase 3 : Dynamisation Front-end** | Raccordement Streamlit (7 pages) + Panneau Démo 1-Clic + Auto-refresh natif | ✅ **TERMINÉ** |
-| **Phase 4 : Hardening & Tests** | Couverture de tests accrue + répétition générale soutenance | 📅 **À VENIR** |
+| **Phase 4 : Hardening & Tests** | Couverture de tests accrue + répétition générale soutenance | ✅ **TERMINÉ** |
 
 ---
 
@@ -136,3 +136,47 @@ Recette globale validée le 08/10/2026 (aucun échec) :
 | 6 actes de démo (dont PDF) | `recette_6actes.ps1` | ✅ 6/6 |
 
 Base de données sauvegardée dans `backup/`. Préflight `scripts/check_env.ps1` → exit 0.
+
+---
+
+## 6. Note de recette Phase 4 — hardening & répétition générale (18/10/2026)
+
+### 6.1 Couverture de tests
+Ajout de **4 fichiers de tests** (31 nouveaux tests, code applicatif inchangé) ciblant
+les zones les moins couvertes identifiées par `pytest --cov=app` :
+
+| Fichier de tests | Cible |
+| :--- | :--- |
+| `tests/test_phase4_simulation.py` | 4 endpoints de démo (brute-force, stress disque, faille CIS, reset) + purging sélectif |
+| `tests/test_phase4_scheduler.py` | jobs APScheduler (télémétrie bornée, pinning démo, TTF, santé, purge, start/stop idempotent) |
+| `tests/test_phase4_services.py` | `security_service` (repli statistique déterministe + Isolation Forest), `netdevops_service` (CIS, hash SHA-256, merge LLM), `assistant_service` (4 intents + repli hors-ligne) |
+| `tests/test_phase4_endpoints.py` | endpoints `inventory` et `supervision` (filtres, création, 404, santé, TTF avec/sans données) |
+
+**Résultat : `pytest --cov=app` → 70 passed, couverture globale 94 %**
+(baseline 75 % → 78 points manquants sur 1301 instructions ; `simulation.py` 99 %,
+`scheduler.py` 81 %, `security_service` 95 %, `assistant_service` 93 %, 10 fichiers à 100 %).
+
+### 6.2 Répétition générale (10/10 contrôles verts)
+
+| Contrôle | Script | Résultat |
+| :--- | :--- | :---: |
+| Préflight environnement | `scripts/check_env.ps1` | ✅ exit 0 |
+| Tests unitaires + couverture | `pytest -q --cov=app` | ✅ 70 passed / 94 % |
+| 6 actes de démo (API + PDF) | `recette_6actes.ps1` | ✅ 6/6 (PDF %PDF 68,6 Ko) |
+| Scheduler & santé du parc | `backend/verif_etape1.py` | ✅ TOUT EST OK |
+| Rétention & purge | `backend/verif_etape2.py` | ✅ TOUT EST OK |
+| Auth / MFA / rôles / anti-force-brute | `backend/verif_etape3.py` | ✅ TOUT EST OK (16 checks) |
+| Rapport PDF | `backend/verif_etape4.py` | ✅ TOUT EST OK |
+| Front : rôles, session, hors-ligne | `frontend/verif_etape3_front.py` | ✅ TOUT EST OK |
+| 7 pages en mode hors-ligne | `frontend/verif_hors_ligne_pages.py` | ✅ 14/14 |
+| Supervision prédictive (TTF) | `frontend/verif_etape5_supervision.py` | ✅ 13/13 |
+
+**Note d'état :** la section « état nominal » de `verif_etape5_supervision.py` exige l'absence
+de prédiction TTF fraîche (<10 min). Or le scheduler régénère en continu de telles prédictions
+dès qu'une série récente est significativement haussière (marche aléatoire du parc, cas
+stochastique — la base de référence du 08/10 contenait elle aussi une alerte RTR-EDGE-01
+active). Avant la répétition, un **reset d'état** a été effectué (backup horodaté dans
+`backup/sentinelle_aiops_20261018_0217.db`, purge des séries récentes, base trackée par git
+restaurable via `git restore`) pour repartir d'un parc nominal — sans aucune modification du
+code applicatif.
+
